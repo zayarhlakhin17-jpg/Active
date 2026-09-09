@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import request from "supertest";
 import app from "../server.ts";
-import { verifyOwnerAuth } from "../server/firebaseAdmin";
+import { verifyOwnerAuth } from "../server/firebaseAdmin.ts";
 import {
   normalizeNotionDatabaseId,
   getValidatedServerConfig,
@@ -11,7 +11,7 @@ import {
   splitTextToRichText,
   resolveSchemaMapping,
   NOTION_FIELD_MAX_LENGTH,
-} from "../server/notionService";
+} from "../server/notionService.ts";
 
 const mockVerifyIdToken = vi.fn();
 
@@ -32,6 +32,7 @@ describe("Notion Integration & Security Hardening Tests", () => {
     vi.restoreAllMocks();
     process.env = {
       ...originalEnv,
+      NODE_ENV: "test",
       ADMIN_FIREBASE_UID: "test-admin-owner-uid-999",
       NOTION_API_KEY: "secret_test_notion_key_abc",
       NOTION_DATABASE_ID: "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d",

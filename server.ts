@@ -2,12 +2,12 @@ import express from "express";
 import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
-import { verifyOwnerAuth } from "./server/firebaseAdmin";
+import { verifyOwnerAuth } from "./server/firebaseAdmin.ts";
 import {
   getValidatedServerConfig,
   testNotionConnection,
   syncDiaryEntry,
-} from "./server/notionService";
+} from "./server/notionService.ts";
 
 dotenv.config();
 
@@ -293,6 +293,6 @@ async function startServer() {
 export default app;
 export { app, startServer };
 
-if (process.env.NODE_ENV !== "test" && !process.env.VERCEL) {
+if (process.env.NODE_ENV !== "test" && !process.env.VERCEL && !process.env.VITEST) {
   startServer();
 }
