@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import request from "supertest";
-import app from "../server";
+import app from "../server.ts";
 import { verifyOwnerAuth } from "../server/firebaseAdmin";
 import {
   normalizeNotionDatabaseId,
@@ -575,6 +575,22 @@ describe("Notion Integration & Security Hardening Tests", () => {
       expect(res.body.success).toBe(true);
       expect(res.body.readyToSync).toBe(true);
       expect(res.body.databaseTitle).toBe("Manhattan Tracker");
+    });
+  });
+
+  describe("8. Vercel Serverless Entrypoint (api/index.ts)", () => {
+    it("imports Vercel serverless entrypoint without throwing ERR_UNSUPPORTED_DIR_IMPORT", async () => {
+      const vercelModule = await import("../api/index.ts");
+      expect(vercelModule.default).toBeDefined();
+      expect(vercelModule.default).toBe(app);
+    });
+
+    it("handles /api/health through the Vercel entrypoint app", async () => {
+      const vercelModule = await import("../api/index.ts");
+      const vercelApp = vercelModule.default;
+      const res = await request(vercelApp).get("/api/health");
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe("ok");
     });
   });
 });

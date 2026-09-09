@@ -2,7 +2,6 @@ import express from "express";
 import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
-import { createServer as createViteServer } from "vite";
 import { verifyOwnerAuth } from "./server/firebaseAdmin";
 import {
   getValidatedServerConfig,
@@ -272,6 +271,7 @@ app.post("/api/cloud/sync", (req, res) => {
 // Setup Vite middleware for dev or static serving for prod
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
