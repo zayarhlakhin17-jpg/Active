@@ -1,0 +1,6 @@
+{
+  "name": "Manhattan Habit & Activity Tracker",
+  "description": "Personal habit tracker and productivity dashboard featuring the Manhattan Project audit, Clera Executive Diary, 3D visualizations, and Google Workspace integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+@layer utilities {
+  /* Lethal Shining Black & White Overlay System */
+  .lethal-canvas {
+    background-color: #000000;
+    color: #ffffff;
+  }
+
+  .shining-card {
+    position: relative;
+    background: radial-gradient(120% 120% at 50% 0%, rgba(255, 255, 255, 0.04) 0%, rgba(10, 10, 12, 0.95) 60%, #000000 100%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 0 30px rgba(255, 255, 255, 0.04), 0 20px 40px -15px rgba(0, 0, 0, 0.9);
+  }
+
+  .shining-card::before {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.5) 50%, transparent 100%);
+    pointer-events: none;
+  }
+
+  .shining-border {
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+
+  .shining-border-glow {
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    box-shadow: 0 0 25px rgba(255, 255, 255, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.5);
+  }
+
+  .white-overlay-glass {
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+  }
+
+  .white-glow-btn {
+    background-color: #ffffff;
+    color: #000000;
+    font-weight: 800;
+    box-shadow: 0 0 25px rgba(255, 255, 255, 0.45);
+    border: 1px solid #ffffff;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .white-glow-btn:hover {
+    background-color: #e4e4e7;
+    box-shadow: 0 0 35px rgba(255, 255, 255, 0.65);
+    transform: translateY(-1px);
+  }
+
+  .white-pill-active {
+    background-color: #ffffff;
+    color: #000000;
+    font-weight: 800;
+    box-shadow: 0 0 25px rgba(255, 255, 255, 0.45);
+    border: 1px solid #ffffff;
+  }
+
+  .white-pill-inactive {
+    color: #a1a1aa;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.02);
+    transition: all 0.2s ease;
+  }
+
+  .white-pill-inactive:hover {
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .chrome-text {
+    background: linear-gradient(180deg, #ffffff 0%, #d4d4d8 50%, #71717a 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+
