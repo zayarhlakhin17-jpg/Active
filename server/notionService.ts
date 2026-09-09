@@ -1,6 +1,9 @@
 import { NotionDiarySyncEntry, NotionSyncResponse } from "../src/types";
 
 export const NOTION_API_VERSION = "2022-06-28";
+export const NOTION_TEXT_CHUNK_LIMIT = 2000;
+export const NOTION_MAX_RICH_TEXT_CHUNKS = 100;
+export const NOTION_FIELD_MAX_LENGTH = NOTION_TEXT_CHUNK_LIMIT * NOTION_MAX_RICH_TEXT_CHUNKS; // 200,000 characters
 
 /**
  * Normalizes a Notion database ID or URL into a clean UUID string.
@@ -62,14 +65,16 @@ export function getValidatedServerConfig(clientBody: any): { apiKey: string; dat
 }
 
 /**
- * Handle Notion API error responses with clear, actionable messages.
+ * Handle Notion API error responses with clear, actionable messages, preserving retry-after headers.
  */
-function handleNotionApiError(res: Response, data: any, context: string): never {
+export function handleNotionApiError(res: Response, data: any, context: string): never {
   const status = res.status;
   const code = data?.code;
   const rawMsg = data?.message || "Unknown error";
 
   let userFriendly = `${context}: ${rawMsg}`;
+
+  const retryAfter = res.headers?.get?.("retry-after") || res.headers?.get?.("Retry-After");
 
   if (status === 401 || code === "unauthorized") {
     userFriendly = "Notion API authentication failed: Invalid internal integration token. Check NOTION_API_KEY.";
@@ -77,7 +82,9 @@ function handleNotionApiError(res: Response, data: any, context: string): never 
     userFriendly =
       "Notion database not found or access denied. Ensure NOTION_DATABASE_ID is correct and the database is shared with your integration (Database menu -> Connections -> Add connection).";
   } else if (status === 429 || code === "rate_limited") {
-    userFriendly = "Notion API rate limit exceeded. Please wait a few moments and retry.";
+    userFriendly = retryAfter
+      ? `Notion API rate limit exceeded. Retry after ${retryAfter} seconds.`
+      : "Notion API rate limit exceeded. Please wait a few moments and retry.";
   } else if (code === "validation_error") {
     userFriendly = `Notion schema validation error: ${rawMsg}`;
   }
@@ -85,11 +92,324 @@ function handleNotionApiError(res: Response, data: any, context: string): never 
   const err: any = new Error(userFriendly);
   err.status = status;
   err.notionCode = code;
+  if (retryAfter) {
+    err.retryAfter = retryAfter;
+  }
   throw err;
 }
 
 /**
- * Test Connection: Verifies token, database access, and schema property types.
+ * Splits arbitrary length text into Notion rich_text objects of max 2000 chars each.
+ * Throws an error before writing if the text exceeds Notion's total capacity (200,000 chars),
+ * ensuring zero content is silently dropped or lost.
+ */
+export function splitTextToRichText(
+  text: string,
+  fieldName: string = "field"
+): Array<{ type: "text"; text: { content: string } }> {
+  if (!text) return [];
+
+  if (text.length > NOTION_FIELD_MAX_LENGTH) {
+    const err: any = new Error(
+      `Cannot export entry without data loss: '${fieldName}' length (${text.length} characters) exceeds Notion maximum capacity (${NOTION_FIELD_MAX_LENGTH} characters).`
+    );
+    err.status = 400;
+    throw err;
+  }
+
+  const chunks: Array<{ type: "text"; text: { content: string } }> = [];
+  let remaining = text;
+
+  while (remaining.length > 0) {
+    if (remaining.length <= NOTION_TEXT_CHUNK_LIMIT) {
+      chunks.push({
+        type: "text",
+        text: { content: remaining },
+      });
+      break;
+    }
+
+    // Attempt to split cleanly near newline or word boundary within 2000 character limit
+    let splitPoint = NOTION_TEXT_CHUNK_LIMIT;
+    const window = remaining.slice(0, NOTION_TEXT_CHUNK_LIMIT);
+    const lastNewline = window.lastIndexOf("\n");
+    const lastSpace = window.lastIndexOf(" ");
+
+    if (lastNewline > NOTION_TEXT_CHUNK_LIMIT - 300) {
+      splitPoint = lastNewline + 1;
+    } else if (lastSpace > NOTION_TEXT_CHUNK_LIMIT - 150) {
+      splitPoint = lastSpace + 1;
+    }
+
+    chunks.push({
+      type: "text",
+      text: { content: remaining.slice(0, splitPoint) },
+    });
+    remaining = remaining.slice(splitPoint);
+  }
+
+  return chunks;
+}
+
+/**
+ * Validates a diary entry payload before syncing.
+ * Strictly validates calendar dates (including valid days in month and leap years).
+ * Validates dayScore between 0 and 100 inclusive (score of 0 is legitimate).
+ */
+export function validateDiaryEntry(entry: any): NotionDiarySyncEntry {
+  if (!entry || typeof entry !== "object") {
+    const err: any = new Error("Missing diary entry payload.");
+    err.status = 400;
+    throw err;
+  }
+
+  const { date, dayScore, verdict } = entry;
+
+  if (!date || typeof date !== "string") {
+    const err: any = new Error("Malformed or missing diary date. Expected YYYY-MM-DD.");
+    err.status = 400;
+    throw err;
+  }
+
+  const trimmedDate = date.trim();
+  const dateMatch = trimmedDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!dateMatch) {
+    const err: any = new Error("Malformed diary date format. Expected strictly YYYY-MM-DD.");
+    err.status = 400;
+    throw err;
+  }
+
+  const year = parseInt(dateMatch[1], 10);
+  const month = parseInt(dateMatch[2], 10);
+  const day = parseInt(dateMatch[3], 10);
+
+  if (year < 1970 || year > 2100) {
+    const err: any = new Error(`Invalid calendar date: year ${year} is out of realistic range.`);
+    err.status = 400;
+    throw err;
+  }
+
+  if (month < 1 || month > 12) {
+    const err: any = new Error(`Invalid calendar date: month ${month} must be between 01 and 12.`);
+    err.status = 400;
+    throw err;
+  }
+
+  // Days in month calculation (UTC based to avoid daylight savings quirks)
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  if (day < 1 || day > daysInMonth) {
+    const err: any = new Error(
+      `Invalid calendar date: ${trimmedDate} is impossible (${year}-${dateMatch[2]} has only ${daysInMonth} days).`
+    );
+    err.status = 400;
+    throw err;
+  }
+
+  // dayScore must be a number between 0 and 100 inclusive
+  if (typeof dayScore !== "number" || isNaN(dayScore)) {
+    const err: any = new Error("Malformed or missing diary dayScore. Expected a number.");
+    err.status = 400;
+    throw err;
+  }
+
+  if (dayScore < 0 || dayScore > 100) {
+    const err: any = new Error(
+      `Invalid dayScore: ${dayScore}. Score must be between 0 and 100 inclusive.`
+    );
+    err.status = 400;
+    throw err;
+  }
+
+  if (!verdict || typeof verdict !== "string" || verdict.trim() === "") {
+    const err: any = new Error("Malformed or missing diary verdict. Expected a non-empty string.");
+    err.status = 400;
+    throw err;
+  }
+
+  return {
+    date: trimmedDate,
+    title: typeof entry.title === "string" && entry.title.trim() ? entry.title.trim() : `CLERA Executive Diary — ${trimmedDate}`,
+    dayScore,
+    verdict: verdict.trim(),
+    executiveSummary: typeof entry.executiveSummary === "string" ? entry.executiveSummary.trim() : "",
+    biggestWin: typeof entry.biggestWin === "string" ? entry.biggestWin.trim() : "",
+    biggestExecutionLeak: typeof entry.biggestExecutionLeak === "string" ? entry.biggestExecutionLeak.trim() : "",
+    tomorrowsFirstAction: typeof entry.tomorrowsFirstAction === "string" ? entry.tomorrowsFirstAction.trim() : "",
+    openQuestionsBlockers: typeof entry.openQuestionsBlockers === "string" ? entry.openQuestionsBlockers.trim() : "",
+    evidenceLinks: typeof entry.evidenceLinks === "string" ? entry.evidenceLinks.trim() : "",
+  };
+}
+
+export interface FieldDefinition {
+  field: string;
+  label: string;
+  required: boolean;
+  supportedNames: string[];
+  acceptedTypes: string[];
+}
+
+export const DIARY_FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
+  title: {
+    field: "title",
+    label: "Title",
+    required: true,
+    supportedNames: ["Name", "Title", "Diary", "Entry", "Log"],
+    acceptedTypes: ["title"],
+  },
+  date: {
+    field: "date",
+    label: "Date",
+    required: true,
+    supportedNames: ["Date", "Day", "Log Date", "Entry Date", "Diary Date"],
+    acceptedTypes: ["date"],
+  },
+  score: {
+    field: "score",
+    label: "Score",
+    required: true,
+    supportedNames: ["Score", "Day Score", "Total Score", "Daily Score", "Audit Score", "Rating"],
+    acceptedTypes: ["number"],
+  },
+  verdict: {
+    field: "verdict",
+    label: "Verdict",
+    required: true,
+    supportedNames: ["Verdict", "Assessment", "Day Verdict", "Manager Assessment", "Status"],
+    acceptedTypes: ["select", "status", "rich_text"],
+  },
+  summary: {
+    field: "summary",
+    label: "Executive Summary",
+    required: false,
+    supportedNames: ["Summary", "Executive Summary", "Notes", "Daily Summary"],
+    acceptedTypes: ["rich_text"],
+  },
+  wins: {
+    field: "wins",
+    label: "Biggest Win",
+    required: false,
+    supportedNames: ["Wins", "Biggest Win", "Practical Work", "Practical Work Built", "Accomplishments"],
+    acceptedTypes: ["rich_text"],
+  },
+  blockers: {
+    field: "blockers",
+    label: "Execution Leak & Blockers",
+    required: false,
+    supportedNames: ["Blockers", "Execution Leak", "Biggest Execution Leak", "Leaks", "Obstacles", "Open Questions"],
+    acceptedTypes: ["rich_text"],
+  },
+  nextAction: {
+    field: "nextAction",
+    label: "Tomorrow's Action",
+    required: false,
+    supportedNames: ["Next Action", "Next First Action", "Tomorrow", "Tomorrow's Action", "Action Item"],
+    acceptedTypes: ["rich_text"],
+  },
+  evidence: {
+    field: "evidence",
+    label: "Evidence",
+    required: false,
+    supportedNames: ["Evidence", "Evidence Links", "Links", "Commits", "Git Commits", "Artifacts"],
+    acceptedTypes: ["url", "rich_text"],
+  },
+};
+
+export interface SchemaResolutionResult {
+  schemaValid: boolean;
+  readyToSync: boolean;
+  mapping: Record<string, string | null>;
+  errors: string[];
+  warnings: string[];
+}
+
+/**
+ * Inspects Notion database properties using explicit supported names and strict type checking.
+ * - Never falls back to arbitrary properties of the same type.
+ * - Never maps multiple diary fields to the same Notion property.
+ * - Missing or incompatible required properties block synchronization.
+ * - Missing optional properties are left unmapped and do NOT overwrite other fields.
+ */
+export function resolveSchemaMapping(properties: Record<string, any>): SchemaResolutionResult {
+  const mapping: Record<string, string | null> = {};
+  const usedPropertyKeys = new Set<string>();
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  const propKeys = Object.keys(properties);
+
+  // 1. Resolve Title property: Notion requires exactly one property of type 'title'
+  const titlePropKey = propKeys.find((k) => properties[k].type === "title");
+  if (titlePropKey) {
+    mapping.title = titlePropKey;
+    usedPropertyKeys.add(titlePropKey);
+  } else {
+    errors.push("Missing required Title property (type: title).");
+  }
+
+  // 2. Resolve other fields in order
+  for (const [fieldKey, def] of Object.entries(DIARY_FIELD_DEFINITIONS)) {
+    if (fieldKey === "title") continue; // already handled
+
+    let matchedKey: string | null = null;
+
+    // Check each supported name case-insensitively
+    for (const name of def.supportedNames) {
+      const found = propKeys.find((k) => k.toLowerCase() === name.toLowerCase());
+      if (found) {
+        // Verify it isn't already assigned to another field
+        if (usedPropertyKeys.has(found)) {
+          warnings.push(
+            `Property '${found}' matched multiple fields and was already reserved for another field.`
+          );
+          continue;
+        }
+
+        const propType = properties[found]?.type;
+        if (def.acceptedTypes.includes(propType)) {
+          matchedKey = found;
+          break;
+        } else {
+          // Property exists with correct name but incompatible type
+          const expected = def.acceptedTypes.join(" or ");
+          if (def.required) {
+            errors.push(
+              `Required property '${found}' has incompatible type '${propType}'. Expected ${expected}.`
+            );
+          } else {
+            warnings.push(
+              `Optional property '${found}' has incompatible type '${propType}'. Expected ${expected}.`
+            );
+          }
+        }
+      }
+    }
+
+    if (matchedKey) {
+      mapping[fieldKey] = matchedKey;
+      usedPropertyKeys.add(matchedKey);
+    } else {
+      mapping[fieldKey] = null;
+      if (def.required && !errors.some((e) => e.includes(def.label))) {
+        errors.push(
+          `Missing required property for ${def.label}. Expected name matching [${def.supportedNames.join(", ")}] with type [${def.acceptedTypes.join(", ")}].`
+        );
+      }
+    }
+  }
+
+  const schemaValid = errors.length === 0;
+  return {
+    schemaValid,
+    readyToSync: schemaValid,
+    mapping,
+    errors,
+    warnings,
+  };
+}
+
+/**
+ * Test Connection: Verifies integration token, database access, and schema validity.
+ * Distinguishes "database accessible" from "schema valid and ready to sync".
  */
 export async function testNotionConnection(
   apiKey: string,
@@ -115,130 +435,44 @@ export async function testNotionConnection(
       : "Manhattan Diary Database";
 
   const properties = data.properties || {};
-  const propKeys = Object.keys(properties);
+  const schemaResolution = resolveSchemaMapping(properties);
 
-  // Check required and recommended properties
-  const titleProp = Object.values(properties).find((p: any) => p.type === "title") as any;
-  const hasDate = Object.values(properties).some((p: any) => p.type === "date");
-  const hasScore = Object.values(properties).some((p: any) => p.type === "number");
-  const hasVerdict = Object.values(properties).some(
-    (p: any) => p.type === "select" || p.type === "status" || p.type === "rich_text"
-  );
-
-  const missing: string[] = [];
-  const warnings: string[] = [];
-
-  if (!titleProp) {
-    missing.push("Title property");
-  }
-  if (!hasDate) {
-    missing.push("Date (type: date)");
-  }
-  if (!hasScore) {
-    missing.push("Score (type: number)");
-  }
-  if (!hasVerdict) {
-    missing.push("Verdict (type: select / status / rich_text)");
-  }
-
-  // Look specifically for property names matching standard conventions
-  if (properties["Score"] && properties["Score"].type !== "number") {
-    warnings.push(`Property 'Score' exists but has type '${properties["Score"].type}' instead of 'number'.`);
-  }
-  if (properties["Date"] && properties["Date"].type !== "date") {
-    warnings.push(`Property 'Date' exists but has type '${properties["Date"].type}' instead of 'date'.`);
-  }
+  const message = schemaResolution.readyToSync
+    ? `Successfully connected to Notion database "${dbTitle}". Schema is valid and ready to sync.`
+    : `Connected to Notion database "${dbTitle}", but schema is incomplete or incompatible for sync.`;
 
   return {
     success: true,
-    message: `Successfully connected to Notion database "${dbTitle}".`,
+    databaseAccessible: true,
+    schemaValid: schemaResolution.schemaValid,
+    readyToSync: schemaResolution.readyToSync,
+    message,
     databaseTitle: dbTitle,
     schemaDetails: {
-      propertiesFound: propKeys.map((k) => `${k} (${properties[k].type})`),
-      missingProperties: missing,
-      warnings: warnings.length > 0 ? warnings : undefined,
+      propertiesFound: Object.keys(properties).map((k) => `${k} (${properties[k].type})`),
+      missingProperties: schemaResolution.errors,
+      warnings: schemaResolution.warnings.length > 0 ? schemaResolution.warnings : undefined,
     },
   };
 }
 
-/**
- * Validates a diary entry payload before syncing. Rejects malformed or missing fields.
- */
-export function validateDiaryEntry(entry: any): NotionDiarySyncEntry {
-  if (!entry || typeof entry !== "object") {
-    const err: any = new Error("Missing diary entry payload.");
-    err.status = 400;
-    throw err;
-  }
-
-  const { date, dayScore, verdict } = entry;
-
-  if (!date || typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date.trim())) {
-    const err: any = new Error("Malformed or missing diary date. Expected YYYY-MM-DD.");
-    err.status = 400;
-    throw err;
-  }
-
-  if (typeof dayScore !== "number" || isNaN(dayScore)) {
-    const err: any = new Error("Malformed or missing diary dayScore. Expected a number.");
-    err.status = 400;
-    throw err;
-  }
-
-  if (!verdict || typeof verdict !== "string" || verdict.trim() === "") {
-    const err: any = new Error("Malformed or missing diary verdict. Expected a non-empty string.");
-    err.status = 400;
-    throw err;
-  }
-
-  return {
-    date: date.trim(),
-    title: typeof entry.title === "string" && entry.title.trim() ? entry.title.trim() : `CLERA Executive Diary — ${date.trim()}`,
-    dayScore,
-    verdict: verdict.trim(),
-    executiveSummary: typeof entry.executiveSummary === "string" ? entry.executiveSummary.trim() : "",
-    biggestWin: typeof entry.biggestWin === "string" ? entry.biggestWin.trim() : "",
-    biggestExecutionLeak: typeof entry.biggestExecutionLeak === "string" ? entry.biggestExecutionLeak.trim() : "",
-    tomorrowsFirstAction: typeof entry.tomorrowsFirstAction === "string" ? entry.tomorrowsFirstAction.trim() : "",
-    openQuestionsBlockers: typeof entry.openQuestionsBlockers === "string" ? entry.openQuestionsBlockers.trim() : "",
-    evidenceLinks: typeof entry.evidenceLinks === "string" ? entry.evidenceLinks.trim() : "",
-  };
-}
+// In-flight concurrency lock per databaseId:date to ensure sequential, duplicate-safe execution
+const inFlightSyncLocks = new Map<string, Promise<NotionSyncResponse>>();
 
 /**
- * Finds matching property in database schema by checking exact or case-insensitive names, or fallback to type.
+ * Core implementation of diary sync.
+ * 1. Validates schema: required properties missing/incompatible block sync.
+ * 2. Queries database for duplicates: any query failure (HTTP, network, 429, malformed) ABORTS immediately.
+ * 3. If multiple matching pages found: aborts with 409 conflict.
+ * 4. If exactly 1 match found: updates properties via PATCH (preserving body blocks).
+ * 5. If 0 matches confirmed: creates new page via POST with full content preserved.
  */
-function findPropertyKey(
-  properties: Record<string, any>,
-  targetNames: string[],
-  acceptedTypes: string[]
-): string | null {
-  // 1. Check exact/case-insensitive name match with acceptable type
-  for (const name of targetNames) {
-    const matchedKey = Object.keys(properties).find(
-      (k) => k.toLowerCase() === name.toLowerCase() && acceptedTypes.includes(properties[k].type)
-    );
-    if (matchedKey) return matchedKey;
-  }
-  // 2. Fallback: match any property of the primary accepted type
-  const fallback = Object.keys(properties).find((k) => acceptedTypes.includes(properties[k].type));
-  return fallback || null;
-}
-
-/**
- * Syncs the selected diary entry to Notion:
- * Queries database first to prevent duplicates.
- * If page exists for this date, updates its properties via PATCH (preserving human-written page content).
- * If page does not exist, creates it via POST.
- */
-export async function syncDiaryEntry(
+async function executeSyncDiaryEntry(
   apiKey: string,
   databaseId: string,
-  rawEntry: any
+  entry: NotionDiarySyncEntry
 ): Promise<NotionSyncResponse> {
-  const entry = validateDiaryEntry(rawEntry);
-
-  // 1. Fetch database schema to bind properties dynamically & correctly
+  // 1. Fetch database schema to bind properties dynamically
   const dbRes = await fetch(`https://api.notion.com/v1/databases/${databaseId}`, {
     method: "GET",
     headers: {
@@ -246,48 +480,35 @@ export async function syncDiaryEntry(
       "Notion-Version": NOTION_API_VERSION,
     },
   });
+
   const dbData = await dbRes.json();
   if (!dbRes.ok) {
     handleNotionApiError(dbRes, dbData, "Failed to inspect Notion database schema");
   }
 
   const properties = dbData.properties || {};
+  const schema = resolveSchemaMapping(properties);
 
-  // Identify property keys
-  const titleKey =
-    Object.keys(properties).find((k) => properties[k].type === "title") || "Name";
-  const dateKey = findPropertyKey(properties, ["Date", "Day", "Log Date"], ["date"]);
-  const scoreKey = findPropertyKey(properties, ["Score", "Day Score", "Total Score", "Rating"], ["number"]);
-  const verdictKey = findPropertyKey(properties, ["Verdict", "Status", "Assessment"], ["select", "status", "rich_text"]);
-  const summaryKey = findPropertyKey(properties, ["Summary", "Executive Summary", "Notes"], ["rich_text"]);
-  const winsKey = findPropertyKey(properties, ["Wins", "Biggest Win", "Practical Work"], ["rich_text"]);
-  const blockersKey = findPropertyKey(properties, ["Blockers", "Execution Leak", "Leaks"], ["rich_text"]);
-  const nextActionKey = findPropertyKey(properties, ["Next Action", "Next First Action", "Tomorrow"], ["rich_text"]);
-  const evidenceKey = findPropertyKey(properties, ["Evidence", "Evidence Links", "Links", "Commits"], ["url", "rich_text"]);
+  // Missing or incompatible required properties block synchronization
+  if (!schema.readyToSync) {
+    const err: any = new Error(
+      `Cannot synchronize entry: Schema validation failed. ${schema.errors.join(" ")}`
+    );
+    err.status = 400;
+    throw err;
+  }
 
-  // 2. Query database for existing page for this stable date key
-  let existingPageId: string | null = null;
-  let existingPageUrl: string | null = null;
+  const { mapping } = schema;
+  const titleKey = mapping.title!;
+  const dateKey = mapping.date!;
+  const scoreKey = mapping.score!;
+  const verdictKey = mapping.verdict!;
 
+  // 2. Query database for existing page with this exact date
+  // A FAILED DATABASE QUERY MUST NEVER FALL THROUGH TO CREATING A NEW PAGE!
+  let queryRes: Response;
   try {
-    let filterObj: any = null;
-    if (dateKey && properties[dateKey]?.type === "date") {
-      filterObj = {
-        property: dateKey,
-        date: {
-          equals: entry.date,
-        },
-      };
-    } else {
-      filterObj = {
-        property: titleKey,
-        title: {
-          contains: entry.date,
-        },
-      };
-    }
-
-    const queryRes = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
+    queryRes = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -295,115 +516,136 @@ export async function syncDiaryEntry(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        filter: filterObj,
-        page_size: 1,
+        filter: {
+          property: dateKey,
+          date: {
+            equals: entry.date,
+          },
+        },
+        page_size: 10,
       }),
     });
-
-    const queryData = await queryRes.json();
-    if (queryRes.ok && Array.isArray(queryData.results) && queryData.results.length > 0) {
-      existingPageId = queryData.results[0].id;
-      existingPageUrl = queryData.results[0].url;
-    }
-  } catch (err) {
-    console.warn("Could not query existing Notion page by date filter, will proceed to create:", err);
+  } catch (netErr: any) {
+    const err: any = new Error(
+      `Network error during duplicate check: ${netErr.message || "Unable to reach Notion API"}. Aborting sync.`
+    );
+    err.status = 502;
+    throw err;
   }
 
-  // 3. Construct properties payload (Never invent missing information)
+  const queryData = await queryRes.json();
+  if (!queryRes.ok) {
+    // Abort immediately on HTTP error or 429
+    handleNotionApiError(queryRes, queryData, "Failed to query database for duplicates");
+  }
+
+  if (!queryData || !Array.isArray(queryData.results)) {
+    const err: any = new Error(
+      "Malformed query response received from Notion API. Aborting sync to prevent duplicates."
+    );
+    err.status = 502;
+    throw err;
+  }
+
+  // Detect multiple existing matches and report a conflict instead of silently updating first
+  if (queryData.results.length > 1) {
+    const conflictErr: any = new Error(
+      `Duplicate conflict: Found ${queryData.results.length} existing Notion pages for date ${entry.date}. Aborting sync. Please resolve duplicate entries in your Notion database before syncing.`
+    );
+    conflictErr.status = 409;
+    throw conflictErr;
+  }
+
+  let existingPageId: string | null = null;
+  let existingPageUrl: string | null = null;
+
+  if (queryData.results.length === 1) {
+    existingPageId = queryData.results[0].id;
+    existingPageUrl = queryData.results[0].url;
+  }
+
+  // 3. Construct properties payload (Zero silent truncation, preserving long text)
   const pageProperties: Record<string, any> = {};
 
   // Title
   pageProperties[titleKey] = {
-    title: [
-      {
-        type: "text",
-        text: {
-          content: entry.title,
-        },
-      },
-    ],
+    title: splitTextToRichText(entry.title, "title"),
   };
 
   // Date
-  if (dateKey && properties[dateKey]?.type === "date") {
-    pageProperties[dateKey] = {
-      date: {
-        start: entry.date,
-      },
-    };
-  }
+  pageProperties[dateKey] = {
+    date: {
+      start: entry.date,
+    },
+  };
 
-  // Score
-  if (scoreKey && properties[scoreKey]?.type === "number") {
-    pageProperties[scoreKey] = {
-      number: entry.dayScore,
-    };
-  }
+  // Score (Preserves legitimate score of 0)
+  pageProperties[scoreKey] = {
+    number: entry.dayScore,
+  };
 
   // Verdict
-  if (verdictKey) {
-    const vType = properties[verdictKey].type;
-    if (vType === "select") {
-      pageProperties[verdictKey] = {
-        select: { name: entry.verdict },
-      };
-    } else if (vType === "status") {
-      pageProperties[verdictKey] = {
-        status: { name: entry.verdict },
-      };
-    } else if (vType === "rich_text") {
-      pageProperties[verdictKey] = {
-        rich_text: [{ type: "text", text: { content: entry.verdict } }],
-      };
-    }
-  }
-
-  // Summary
-  if (summaryKey && entry.executiveSummary) {
-    pageProperties[summaryKey] = {
-      rich_text: [{ type: "text", text: { content: entry.executiveSummary.slice(0, 2000) } }],
+  const verdictPropType = properties[verdictKey].type;
+  if (verdictPropType === "select") {
+    pageProperties[verdictKey] = {
+      select: { name: entry.verdict },
+    };
+  } else if (verdictPropType === "status") {
+    pageProperties[verdictKey] = {
+      status: { name: entry.verdict },
+    };
+  } else if (verdictPropType === "rich_text") {
+    pageProperties[verdictKey] = {
+      rich_text: splitTextToRichText(entry.verdict, "verdict"),
     };
   }
 
-  // Wins
-  if (winsKey && entry.biggestWin) {
-    pageProperties[winsKey] = {
-      rich_text: [{ type: "text", text: { content: entry.biggestWin.slice(0, 2000) } }],
+  // Summary (Optional)
+  if (mapping.summary && entry.executiveSummary) {
+    pageProperties[mapping.summary] = {
+      rich_text: splitTextToRichText(entry.executiveSummary, "executiveSummary"),
     };
   }
 
-  // Blockers
-  if (blockersKey && (entry.biggestExecutionLeak || entry.openQuestionsBlockers)) {
-    const leakText = [entry.biggestExecutionLeak, entry.openQuestionsBlockers].filter(Boolean).join("\n\n");
-    pageProperties[blockersKey] = {
-      rich_text: [{ type: "text", text: { content: leakText.slice(0, 2000) } }],
+  // Wins (Optional)
+  if (mapping.wins && entry.biggestWin) {
+    pageProperties[mapping.wins] = {
+      rich_text: splitTextToRichText(entry.biggestWin, "biggestWin"),
     };
   }
 
-  // Next Action
-  if (nextActionKey && entry.tomorrowsFirstAction) {
-    pageProperties[nextActionKey] = {
-      rich_text: [{ type: "text", text: { content: entry.tomorrowsFirstAction.slice(0, 2000) } }],
+  // Blockers (Optional)
+  if (mapping.blockers && (entry.biggestExecutionLeak || entry.openQuestionsBlockers)) {
+    const combined = [entry.biggestExecutionLeak, entry.openQuestionsBlockers].filter(Boolean).join("\n\n");
+    pageProperties[mapping.blockers] = {
+      rich_text: splitTextToRichText(combined, "blockers"),
     };
   }
 
-  // Evidence Links
-  if (evidenceKey && entry.evidenceLinks) {
-    const eType = properties[evidenceKey].type;
-    if (eType === "url" && /^https?:\/\//i.test(entry.evidenceLinks)) {
-      pageProperties[evidenceKey] = {
+  // Next Action (Optional)
+  if (mapping.nextAction && entry.tomorrowsFirstAction) {
+    pageProperties[mapping.nextAction] = {
+      rich_text: splitTextToRichText(entry.tomorrowsFirstAction, "tomorrowsFirstAction"),
+    };
+  }
+
+  // Evidence Links (Optional)
+  if (mapping.evidence && entry.evidenceLinks) {
+    const evidenceType = properties[mapping.evidence].type;
+    if (evidenceType === "url" && /^https?:\/\//i.test(entry.evidenceLinks)) {
+      pageProperties[mapping.evidence] = {
         url: entry.evidenceLinks,
       };
-    } else if (eType === "rich_text") {
-      pageProperties[evidenceKey] = {
-        rich_text: [{ type: "text", text: { content: entry.evidenceLinks.slice(0, 2000) } }],
+    } else {
+      pageProperties[mapping.evidence] = {
+        rich_text: splitTextToRichText(entry.evidenceLinks, "evidenceLinks"),
       };
     }
   }
 
-  // 4. Update existing page OR create a new page
+  // 4. Update existing page OR create new page
   if (existingPageId) {
-    // PATCH updates only properties, preserving any user-written blocks on the page
+    // PATCH updates properties without modifying body blocks
     const patchRes = await fetch(`https://api.notion.com/v1/pages/${existingPageId}`, {
       method: "PATCH",
       headers: {
@@ -430,7 +672,7 @@ export async function syncDiaryEntry(
     };
   }
 
-  // Create new page with structured starter blocks
+  // 5. Create new page: Page-body structured blocks with full text preservation
   const initialBlocks: any[] = [];
 
   if (entry.executiveSummary) {
@@ -446,7 +688,7 @@ export async function syncDiaryEntry(
         object: "block",
         type: "paragraph",
         paragraph: {
-          rich_text: [{ type: "text", text: { content: entry.executiveSummary } }],
+          rich_text: splitTextToRichText(entry.executiveSummary, "executiveSummary"),
         },
       }
     );
@@ -465,13 +707,14 @@ export async function syncDiaryEntry(
         object: "block",
         type: "paragraph",
         paragraph: {
-          rich_text: [{ type: "text", text: { content: entry.biggestWin } }],
+          rich_text: splitTextToRichText(entry.biggestWin, "biggestWin"),
         },
       }
     );
   }
 
   if (entry.biggestExecutionLeak || entry.openQuestionsBlockers) {
+    const combinedBlockers = [entry.biggestExecutionLeak, entry.openQuestionsBlockers].filter(Boolean).join("\n\n");
     initialBlocks.push(
       {
         object: "block",
@@ -484,12 +727,7 @@ export async function syncDiaryEntry(
         object: "block",
         type: "paragraph",
         paragraph: {
-          rich_text: [
-            {
-              type: "text",
-              text: { content: [entry.biggestExecutionLeak, entry.openQuestionsBlockers].filter(Boolean).join("\n") },
-            },
-          ],
+          rich_text: splitTextToRichText(combinedBlockers, "blockers"),
         },
       }
     );
@@ -508,7 +746,7 @@ export async function syncDiaryEntry(
         object: "block",
         type: "paragraph",
         paragraph: {
-          rich_text: [{ type: "text", text: { content: entry.tomorrowsFirstAction } }],
+          rich_text: splitTextToRichText(entry.tomorrowsFirstAction, "tomorrowsFirstAction"),
         },
       }
     );
@@ -527,7 +765,7 @@ export async function syncDiaryEntry(
         object: "block",
         type: "paragraph",
         paragraph: {
-          rich_text: [{ type: "text", text: { content: entry.evidenceLinks } }],
+          rich_text: splitTextToRichText(entry.evidenceLinks, "evidenceLinks"),
         },
       }
     );
@@ -559,4 +797,37 @@ export async function syncDiaryEntry(
     url: createData.url || `https://notion.so/${createData.id.replace(/-/g, "")}`,
     updated: false,
   };
+}
+
+/**
+ * Entry point for syncing diary entry to Notion.
+ * Enforces per-date in-flight mutex lock to ensure concurrent requests are duplicate-safe.
+ */
+export async function syncDiaryEntry(
+  apiKey: string,
+  databaseId: string,
+  rawEntry: any
+): Promise<NotionSyncResponse> {
+  const entry = validateDiaryEntry(rawEntry);
+  const lockKey = `${databaseId}:${entry.date}`;
+
+  // Wait for any existing in-flight sync for this date to settle
+  while (inFlightSyncLocks.has(lockKey)) {
+    try {
+      await inFlightSyncLocks.get(lockKey);
+    } catch {
+      // ignore rejection from previous sync, then retry
+    }
+  }
+
+  const executionPromise = executeSyncDiaryEntry(apiKey, databaseId, entry);
+  inFlightSyncLocks.set(lockKey, executionPromise);
+
+  try {
+    return await executionPromise;
+  } finally {
+    if (inFlightSyncLocks.get(lockKey) === executionPromise) {
+      inFlightSyncLocks.delete(lockKey);
+    }
+  }
 }

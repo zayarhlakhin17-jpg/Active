@@ -127,6 +127,9 @@ export interface NotionSyncRequestBody {
 export interface NotionSyncResponse {
   success: boolean;
   message: string;
+  databaseAccessible?: boolean;
+  schemaValid?: boolean;
+  readyToSync?: boolean;
   pageId?: string;
   url?: string;
   updated?: boolean;

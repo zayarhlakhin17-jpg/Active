@@ -37,7 +37,7 @@ export const NotionSyncModal: React.FC<NotionSyncModalProps> = ({
   const [selectedDate, setSelectedDate] = useState<string>(diary.date || new Date().toISOString().slice(0, 10));
   const [isLoading, setIsLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{
-    type: "success" | "error";
+    type: "success" | "error" | "warning";
     text: string;
     url?: string;
     pageId?: string;
@@ -156,12 +156,20 @@ export const NotionSyncModal: React.FC<NotionSyncModalProps> = ({
         throw new Error(data.error || data.message || "Failed to reach Notion API");
       }
 
-      const warnings = data.schemaDetails?.warnings;
-      setStatusMsg({
-        type: "success",
-        text: data.message || "Notion integration verified successfully!",
-        schemaWarnings: warnings,
-      });
+      if (data.readyToSync === false) {
+        setStatusMsg({
+          type: "warning",
+          text: data.message || "Database connected, but schema is missing required properties.",
+          schemaWarnings: data.schemaDetails?.missingProperties,
+        });
+      } else {
+        const warnings = data.schemaDetails?.warnings;
+        setStatusMsg({
+          type: "success",
+          text: data.message || "Notion integration verified successfully! Schema is valid and ready to sync.",
+          schemaWarnings: warnings,
+        });
+      }
 
       onSaveConfig({
         ...config,
@@ -297,6 +305,8 @@ export const NotionSyncModal: React.FC<NotionSyncModalProps> = ({
             className={`p-3 mb-4 rounded-xl text-xs space-y-1.5 ${
               statusMsg.type === "success"
                 ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400"
+                : statusMsg.type === "warning"
+                ? "bg-amber-500/10 border border-amber-500/30 text-amber-400"
                 : "bg-rose-500/10 border border-rose-500/30 text-rose-400"
             }`}
           >
@@ -304,8 +314,10 @@ export const NotionSyncModal: React.FC<NotionSyncModalProps> = ({
               <div className="flex items-center gap-2">
                 {statusMsg.type === "success" ? (
                   <CheckCircle2 className="w-4 h-4 shrink-0" />
+                ) : statusMsg.type === "warning" ? (
+                  <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
                 ) : (
-                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
                 )}
                 <span className="font-medium">{statusMsg.text}</span>
               </div>
