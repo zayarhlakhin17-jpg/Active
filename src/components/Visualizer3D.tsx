@@ -42,42 +42,45 @@ export const Visualizer3D: React.FC<Visualizer3DProps> = ({
     container.innerHTML = "";
     container.appendChild(renderer.domElement);
 
-    // Shining Golden Momentum Core Color Palette
-    // 24k Gold, warm luminous amber, champagne gold, and radiant white-gold sparkles
-    let coreColor = 0xffd700; // radiant 24k gold
-    let ringColor = 0xf59e0b; // warm glowing amber gold
-    if (score >= 80) {
-      coreColor = 0xffe082; // Bright sunlit gold
-      ringColor = 0xffd700; // Brilliant gold
-    } else if (score >= 60) {
-      coreColor = 0xfbbf24; // Amber gold
-      ringColor = 0xd97706; // Deep gold
-    } else {
-      coreColor = 0xf59e0b; // Warm amber gold
-      ringColor = 0xb45309; // Bronze gold
-    }
+    // Black & White Core with Gemini Quad Color Flow (Blue, Red, Yellow, Green)
+    // 85% pure brilliant white/chrome particles + 15% Gemini star accents
+    const geminiColors = {
+      blue: 0x4285f4,   // Google Blue
+      red: 0xea4335,    // Google Red
+      yellow: 0xfbbc05, // Google Yellow
+      green: 0x34a853,  // Google Green
+      white: 0xffffff,  // Pure Brilliant White
+      chrome: 0xd4d4d8, // Platinum Chrome
+    };
 
-    // Add Scene Lighting for specular golden reflections
-    const goldPointLight = new THREE.PointLight(0xffd700, 3, 20);
-    goldPointLight.position.set(2, 3, 4);
-    scene.add(goldPointLight);
+    // Scene Lighting: Clean white key light + subtle Gemini blue & red rim lights
+    const whitePointLight = new THREE.PointLight(0xffffff, 3.5, 25);
+    whitePointLight.position.set(0, 4, 4);
+    scene.add(whitePointLight);
 
-    const amberPointLight = new THREE.PointLight(0xf59e0b, 2.5, 20);
-    amberPointLight.position.set(-2, -3, 2);
-    scene.add(amberPointLight);
+    const blueRimLight = new THREE.PointLight(geminiColors.blue, 1.8, 20);
+    blueRimLight.position.set(-4, -2, 2);
+    scene.add(blueRimLight);
 
-    const ambientLight = new THREE.AmbientLight(0xfffae6, 0.6);
+    const redRimLight = new THREE.PointLight(geminiColors.red, 1.6, 20);
+    redRimLight.position.set(4, -2, -2);
+    scene.add(redRimLight);
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
     scene.add(ambientLight);
 
-    // 1. Particle Cloud Sphere (Momentum Orb) in Shining Gold
+    // 1. Particle Cloud Sphere: Crisp monochrome white with Gemini color sparkles
     const particleCount = 1400;
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
     const colors = new Float32Array(particleCount * 3);
 
-    const goldBase = new THREE.Color(coreColor);
-    const goldAccent = new THREE.Color(ringColor);
-    const goldSparkle = new THREE.Color(0xfff8db); // pure diamond champagne sparkle
+    const whiteColor = new THREE.Color(0xffffff);
+    const chromeColor = new THREE.Color(0xd4d4d8);
+    const gBlue = new THREE.Color(geminiColors.blue);
+    const gRed = new THREE.Color(geminiColors.red);
+    const gYellow = new THREE.Color(geminiColors.yellow);
+    const gGreen = new THREE.Color(geminiColors.green);
 
     for (let i = 0; i < particleCount; i++) {
       // Fibonacci sphere distribution
@@ -93,13 +96,22 @@ export const Visualizer3D: React.FC<Visualizer3DProps> = ({
       positions[i * 3 + 1] = y;
       positions[i * 3 + 2] = z;
 
-      // Color variation - shimmering gold, warm amber, and glistening highlights
-      const mixRatio = Math.random();
+      // Color variation: 80% Black/White/Chrome, with 20% delicate Gemini Blue, Red, Yellow, Green
+      const rnd = Math.random();
       let mixed: THREE.Color;
-      if (mixRatio > 0.85) {
-        mixed = goldSparkle.clone();
+
+      if (rnd < 0.06) {
+        mixed = gBlue;
+      } else if (rnd < 0.12) {
+        mixed = gRed;
+      } else if (rnd < 0.18) {
+        mixed = gYellow;
+      } else if (rnd < 0.24) {
+        mixed = gGreen;
+      } else if (rnd < 0.85) {
+        mixed = whiteColor;
       } else {
-        mixed = goldBase.clone().lerp(goldAccent, mixRatio / 0.85);
+        mixed = chromeColor;
       }
 
       colors[i * 3] = mixed.r;
@@ -111,7 +123,7 @@ export const Visualizer3D: React.FC<Visualizer3DProps> = ({
     geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
     const particleMaterial = new THREE.PointsMaterial({
-      size: 0.052,
+      size: 0.05,
       vertexColors: true,
       transparent: true,
       opacity: 0.95,
@@ -121,22 +133,22 @@ export const Visualizer3D: React.FC<Visualizer3DProps> = ({
     const particleSphere = new THREE.Points(geometry, particleMaterial);
     scene.add(particleSphere);
 
-    // 2. Inner Glowing Core Geometry (Icosahedron wireframe in shining 24k gold)
+    // 2. Inner Glowing Core Geometry (Icosahedron wireframe in shining white)
     const coreGeo = new THREE.IcosahedronGeometry(0.78, 1);
     const coreMat = new THREE.MeshBasicMaterial({
-      color: 0xffd700,
+      color: 0xffffff,
       wireframe: true,
       transparent: true,
-      opacity: 0.75,
+      opacity: 0.7,
       blending: THREE.AdditiveBlending,
     });
     const innerCore = new THREE.Mesh(coreGeo, coreMat);
     scene.add(innerCore);
 
-    // Inner core center glow sphere
+    // Inner core center glow sphere - brilliant white
     const innerGlowGeo = new THREE.SphereGeometry(0.35, 16, 16);
     const innerGlowMat = new THREE.MeshBasicMaterial({
-      color: 0xffe57f,
+      color: 0xffffff,
       transparent: true,
       opacity: 0.35,
       blending: THREE.AdditiveBlending,
@@ -144,19 +156,26 @@ export const Visualizer3D: React.FC<Visualizer3DProps> = ({
     const innerGlow = new THREE.Mesh(innerGlowGeo, innerGlowMat);
     scene.add(innerGlow);
 
-    // 3. Orbital Habit Rings in shining polished gold
+    // 3. Orbital Habit Rings in Gemini 4-Color Flow (Blue, Red, Yellow, Green, White)
     const ringsGroup = new THREE.Group();
     const ringCount = Math.max(1, Math.min(totalHabits, 5));
+    const ringColors = [
+      geminiColors.blue,   // Habit 1: Blue
+      geminiColors.red,    // Habit 2: Red
+      geminiColors.yellow, // Habit 3: Yellow
+      geminiColors.green,  // Habit 4: Green
+      geminiColors.white,  // Habit 5: Diamond White
+    ];
 
     for (let r = 0; r < ringCount; r++) {
       const ringRadius = 1.6 + r * 0.25;
-      const ringGeo = new THREE.TorusGeometry(ringRadius, 0.016, 16, 100);
+      const ringGeo = new THREE.TorusGeometry(ringRadius, 0.015, 16, 100);
       const isCompleted = r < habitsCompleted;
 
       const ringMat = new THREE.MeshBasicMaterial({
-        color: isCompleted ? 0xffd700 : 0x78350f,
+        color: isCompleted ? ringColors[r % ringColors.length] : 0x3f3f46,
         transparent: true,
-        opacity: isCompleted ? 0.95 : 0.3,
+        opacity: isCompleted ? 0.95 : 0.25,
         blending: isCompleted ? THREE.AdditiveBlending : THREE.NormalBlending,
       });
 
@@ -267,36 +286,45 @@ export const Visualizer3D: React.FC<Visualizer3DProps> = ({
     <div
       className={`relative overflow-hidden rounded-2xl border transition-all duration-300 ${
         isDarkMode
-          ? "bg-radial from-zinc-900/95 via-black to-zinc-950 border-amber-500/30 text-white shadow-[0_0_45px_rgba(245,158,11,0.15)] before:absolute before:inset-x-0 before:top-0 before:h-[1.5px] before:bg-linear-to-r before:from-transparent before:via-amber-400/90 before:to-transparent"
+          ? "bg-radial from-zinc-900/95 via-black to-zinc-950 border-white/15 text-white shadow-[0_0_35px_rgba(0,0,0,0.8)] before:absolute before:inset-x-0 before:top-0 before:h-[2px] before:bg-linear-to-r before:from-[#4285F4] before:via-[#EA4335] before:via-[#FBBC05] before:to-[#34A853]"
           : "bg-white/90 border-slate-200 text-slate-800 shadow-lg shadow-slate-200/50"
       } backdrop-blur-md ${isExpanded ? "h-96" : "h-72"}`}
     >
       {/* 3D Canvas Mount */}
       <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
 
-      {/* Overlay Badges - Shining Golden Aura */}
+      {/* Overlay Badges - Black & White with Gemini 4-Color Flow */}
       <div className="absolute top-3 left-4 flex items-center gap-2 pointer-events-none">
         <div
-          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold tracking-wider uppercase border ${
+          className={`flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase border ${
             isDarkMode
-              ? "bg-amber-500/15 border-amber-400/40 text-amber-300 shadow-[0_0_20px_rgba(245,158,11,0.35)] backdrop-blur-md"
-              : "bg-amber-100 text-amber-900 border-amber-300"
+              ? "bg-black/80 border-white/20 text-white shadow-[0_0_15px_rgba(255,255,255,0.1)] backdrop-blur-md"
+              : "bg-slate-100 text-slate-900 border-slate-300"
           }`}
         >
-          <Sparkles className="w-3.5 h-3.5 text-amber-300 drop-shadow-[0_0_8px_rgba(251,191,36,0.9)]" />
-          <span className="drop-shadow-[0_0_8px_rgba(251,191,36,0.6)]">Productivity Momentum Core</span>
+          {/* Gemini 4-color mini flow dots */}
+          <div className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#4285F4] shadow-[0_0_6px_rgba(66,133,244,0.9)]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[#EA4335] shadow-[0_0_6px_rgba(234,67,53,0.9)]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[#FBBC05] shadow-[0_0_6px_rgba(251,188,5,0.9)]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[#34A853] shadow-[0_0_6px_rgba(52,168,83,0.9)]" />
+          </div>
+          <span>Momentum Core</span>
         </div>
       </div>
 
-      {/* Metric Overlay Bottom Left - Shining Gold Radiance */}
+      {/* Metric Overlay Bottom Left - Crisp White with Gemini Accents */}
       <div className="absolute bottom-3 left-4 pointer-events-none">
         <div className="text-3xl font-black tracking-tight font-mono flex items-baseline gap-1">
-          <span className="text-amber-400 drop-shadow-[0_0_20px_rgba(251,191,36,0.85)]">{score}</span>
-          <span className="text-xs font-semibold text-amber-200/70">/100</span>
+          <span className="text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.6)]">{score}</span>
+          <span className="text-xs font-semibold text-zinc-400">/100</span>
         </div>
-        <p className="text-[11px] text-amber-100/80 font-medium">
-          {habitsCompleted} of {totalHabits} habits active today
-        </p>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <div className="w-1.5 h-1.5 rounded-full bg-[#4285F4]" />
+          <p className="text-[11px] text-zinc-300 font-medium">
+            {habitsCompleted} of {totalHabits} habits active today
+          </p>
+        </div>
       </div>
 
       {/* Control buttons top right */}
@@ -306,7 +334,7 @@ export const Visualizer3D: React.FC<Visualizer3DProps> = ({
           title="Reset / Toggle Zoom"
           className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
             isDarkMode
-              ? "bg-zinc-950/80 border-amber-500/25 text-amber-300 hover:bg-amber-400 hover:text-black hover:shadow-[0_0_15px_rgba(245,158,11,0.6)] hover:border-amber-300"
+              ? "bg-black/70 border-white/15 text-zinc-300 hover:text-white hover:border-white/40 hover:bg-white/10"
               : "bg-slate-100/80 border-slate-300 text-slate-600 hover:bg-slate-200"
           }`}
         >
@@ -317,7 +345,7 @@ export const Visualizer3D: React.FC<Visualizer3DProps> = ({
           title={isExpanded ? "Collapse View" : "Expand 3D View"}
           className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
             isDarkMode
-              ? "bg-zinc-950/80 border-amber-500/25 text-amber-300 hover:bg-amber-400 hover:text-black hover:shadow-[0_0_15px_rgba(245,158,11,0.6)] hover:border-amber-300"
+              ? "bg-black/70 border-white/15 text-zinc-300 hover:text-white hover:border-white/40 hover:bg-white/10"
               : "bg-slate-100/80 border-slate-300 text-slate-600 hover:bg-slate-200"
           }`}
         >

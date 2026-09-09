@@ -86,7 +86,7 @@ export const HabitDashboard: React.FC<HabitDashboardProps> = ({
     <div
       className={`rounded-2xl border p-5 transition-all relative overflow-hidden ${
         isDarkMode
-          ? "bg-radial from-zinc-900/90 via-black to-zinc-950 border-white/15 text-white shadow-[0_0_35px_rgba(255,255,255,0.05)] before:absolute before:inset-x-0 before:top-0 before:h-[1px] before:bg-linear-to-r before:from-transparent before:via-white/40 before:to-transparent"
+          ? "bg-radial from-zinc-900/90 via-black to-zinc-950 border-white/15 text-white shadow-[0_0_35px_rgba(0,0,0,0.8)] before:absolute before:inset-x-0 before:top-0 before:h-[2px] before:bg-linear-to-r before:from-[#4285F4] before:via-[#EA4335] before:via-[#FBBC05] before:to-[#34A853]"
           : "bg-white border-slate-200 text-slate-900 shadow-sm"
       }`}
     >
@@ -97,7 +97,8 @@ export const HabitDashboard: React.FC<HabitDashboardProps> = ({
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <span>Daily Habit Execution &amp; Goals</span>
             </h3>
-            <span className="text-xs px-2.5 py-0.5 rounded-full font-bold font-mono bg-emerald-500/15 text-emerald-300 border border-emerald-400/30 shadow-[0_0_12px_rgba(16,185,129,0.25)]">
+            <span className="text-xs px-2.5 py-0.5 rounded-full font-bold font-mono bg-white/10 text-white border border-white/20 shadow-[0_0_10px_rgba(255,255,255,0.1)] flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#34A853]" />
               {completedTodayCount}/{habits.length} Complete
             </span>
           </div>
@@ -108,7 +109,7 @@ export const HabitDashboard: React.FC<HabitDashboardProps> = ({
 
         <button
           onClick={onAddHabitClick}
-          className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-extrabold bg-linear-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-black transition-all shadow-[0_0_20px_rgba(245,158,11,0.45)] border border-amber-300 active:scale-98 self-start sm:self-auto cursor-pointer"
+          className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-extrabold bg-white hover:bg-zinc-200 text-black transition-all shadow-[0_0_15px_rgba(255,255,255,0.3)] border border-white active:scale-98 self-start sm:self-auto cursor-pointer"
         >
           <Plus className="w-4 h-4 text-black" />
           <span>Add Custom Habit</span>
@@ -125,7 +126,7 @@ export const HabitDashboard: React.FC<HabitDashboardProps> = ({
               selectedCategory === cat.id
                 ? "bg-white text-black font-extrabold shadow-[0_0_15px_rgba(255,255,255,0.35)] border border-white"
                 : isDarkMode
-                ? "bg-zinc-950 text-zinc-400 hover:text-white border border-white/10 hover:border-amber-400/30"
+                ? "bg-zinc-950 text-zinc-400 hover:text-white border border-white/10 hover:border-white/30"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
@@ -144,16 +145,17 @@ export const HabitDashboard: React.FC<HabitDashboardProps> = ({
           filteredHabits.map((habit) => {
             const isCompleted = habit.completedDates.includes(today);
 
+            // Gemini 4-Color Category Mapping
             const getCategoryBadgeClass = (category: string) => {
               switch (category) {
                 case "engineering":
-                  return "bg-cyan-500/10 border-cyan-400/30 text-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.15)]";
+                  return "bg-[#4285F4]/10 border-[#4285F4]/30 text-[#4285F4] shadow-[0_0_8px_rgba(66,133,244,0.15)]";
                 case "deep-focus":
-                  return "bg-amber-500/10 border-amber-400/30 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.15)]";
+                  return "bg-[#EA4335]/10 border-[#EA4335]/30 text-[#EA4335] shadow-[0_0_8px_rgba(234,67,53,0.15)]";
                 case "mindset":
-                  return "bg-purple-500/10 border-purple-400/30 text-purple-300 shadow-[0_0_8px_rgba(168,85,247,0.15)]";
+                  return "bg-[#FBBC05]/10 border-[#FBBC05]/30 text-[#FBBC05] shadow-[0_0_8px_rgba(251,188,5,0.15)]";
                 case "health":
-                  return "bg-emerald-500/10 border-emerald-400/30 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.15)]";
+                  return "bg-[#34A853]/10 border-[#34A853]/30 text-[#34A853] shadow-[0_0_8px_rgba(52,168,83,0.15)]";
                 default:
                   return "bg-white/10 border-white/20 text-white";
               }
@@ -165,10 +167,10 @@ export const HabitDashboard: React.FC<HabitDashboardProps> = ({
                 className={`group flex items-center justify-between p-3.5 rounded-xl border transition-all duration-200 ${
                   isCompleted
                     ? isDarkMode
-                      ? "bg-emerald-950/20 border-emerald-500/30 text-white shadow-[0_0_15px_rgba(16,185,129,0.12)]"
+                      ? "bg-white/5 border-white/25 text-white shadow-[0_0_15px_rgba(255,255,255,0.05)]"
                       : "bg-emerald-50/50 border-emerald-200 text-slate-900"
                     : isDarkMode
-                    ? "bg-zinc-950/80 border-white/10 hover:border-amber-400/30 text-zinc-200 hover:bg-zinc-900/60"
+                    ? "bg-zinc-950/80 border-white/10 hover:border-white/30 text-zinc-200 hover:bg-zinc-900/60"
                     : "bg-slate-50/60 border-slate-200/80 hover:border-slate-300"
                 }`}
               >
@@ -180,9 +182,9 @@ export const HabitDashboard: React.FC<HabitDashboardProps> = ({
                     title={isCompleted ? "Mark incomplete" : "Mark completed today"}
                   >
                     {isCompleted ? (
-                      <CheckCircle className="w-5 h-5 text-emerald-400 fill-emerald-400/20 drop-shadow-[0_0_10px_rgba(52,211,153,0.9)]" />
+                      <CheckCircle className="w-5 h-5 text-[#34A853] fill-[#34A853]/20 drop-shadow-[0_0_8px_rgba(52,168,83,0.8)]" />
                     ) : (
-                      <Circle className="w-5 h-5 text-zinc-600 hover:text-amber-400" />
+                      <Circle className="w-5 h-5 text-zinc-600 hover:text-white" />
                     )}
                   </button>
 
@@ -190,7 +192,7 @@ export const HabitDashboard: React.FC<HabitDashboardProps> = ({
                     <div className="flex items-center gap-2">
                       <span
                         className={`text-xs font-semibold truncate ${
-                          isCompleted ? "line-through opacity-75 text-zinc-300" : "text-white"
+                          isCompleted ? "line-through opacity-75 text-zinc-400" : "text-white"
                         }`}
                       >
                         {habit.title}
@@ -212,17 +214,17 @@ export const HabitDashboard: React.FC<HabitDashboardProps> = ({
                 {/* Right: Streak badge + Action */}
                 <div className="flex items-center gap-2.5 ml-2">
                   <div
-                    className="flex items-center gap-1 text-xs font-mono font-bold px-2.5 py-1 rounded-lg border border-amber-500/35 bg-amber-500/10 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.2)]"
+                    className="flex items-center gap-1.5 text-xs font-mono font-bold px-2.5 py-1 rounded-lg border border-white/15 bg-black text-white shadow-[0_0_10px_rgba(0,0,0,0.5)]"
                     title={`Current streak: ${habit.currentStreak} days | Best: ${habit.bestStreak} days`}
                   >
-                    <Flame className="w-3.5 h-3.5 fill-orange-400/40 text-orange-400 drop-shadow-[0_0_6px_rgba(249,115,22,0.9)]" />
-                    <span className="drop-shadow-[0_0_6px_rgba(251,191,36,0.6)]">{habit.currentStreak}d</span>
+                    <Flame className="w-3.5 h-3.5 fill-[#EA4335]/40 text-[#EA4335] drop-shadow-[0_0_6px_rgba(234,67,53,0.8)]" />
+                    <span>{habit.currentStreak}d</span>
                   </div>
 
                   {habit.reminderTime && (
                     <button
                       onClick={() => onScheduleReminder(habit)}
-                      className="p-1.5 rounded-lg text-zinc-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors cursor-pointer"
+                      className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                       title={`Automated reminder: ${habit.reminderTime} (Click to schedule in Calendar)`}
                     >
                       <Bell className="w-3.5 h-3.5" />

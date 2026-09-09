@@ -427,25 +427,34 @@ export default function App() {
       }`}
     >
       {/* 1. Executive Top Navigation Bar - Lethal Shining Black with White Overlays */}
+      {/* Sticky Executive Header with Gemini 4-Color Flow Hairline */}
       <header
-        className={`sticky top-0 z-40 border-b backdrop-blur-xl transition-all ${
+        className={`sticky top-0 z-40 border-b backdrop-blur-xl transition-all relative ${
           isDarkMode
-            ? "bg-black/90 border-white/15 shadow-[0_4px_30px_rgba(0,0,0,0.95)]"
-            : "bg-white/85 border-slate-200/80"
+            ? "bg-black/95 border-white/15 shadow-[0_4px_30px_rgba(0,0,0,0.95)] before:absolute before:inset-x-0 before:top-0 before:h-[2px] before:bg-linear-to-r before:from-[#4285F4] before:via-[#EA4335] before:via-[#FBBC05] before:to-[#34A853]"
+            : "bg-white/95 border-slate-200/80 before:absolute before:inset-x-0 before:top-0 before:h-[2px] before:bg-linear-to-r before:from-[#4285F4] before:via-[#EA4335] before:via-[#FBBC05] before:to-[#34A853]"
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           {/* Brand Logo & Evidence Tag */}
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-linear-to-b from-amber-300 via-amber-400 to-yellow-500 text-black flex items-center justify-center font-black shadow-[0_0_25px_rgba(245,158,11,0.55)] border border-amber-300 tracking-wider">
-              M
+            <div className="relative w-9 h-9 rounded-xl bg-zinc-950 text-white flex items-center justify-center font-black shadow-[0_0_20px_rgba(255,255,255,0.15)] border border-white/30 tracking-wider">
+              <span>M</span>
+              {/* Gemini 4-dot indicator in logo */}
+              <div className="absolute -bottom-1 -right-1 flex items-center gap-0.5 p-0.5 bg-black rounded-full border border-white/20">
+                <span className="w-1 h-1 rounded-full bg-[#4285F4]" />
+                <span className="w-1 h-1 rounded-full bg-[#EA4335]" />
+                <span className="w-1 h-1 rounded-full bg-[#FBBC05]" />
+                <span className="w-1 h-1 rounded-full bg-[#34A853]" />
+              </div>
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-black text-sm tracking-tight text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.4)]">
                   MANHATTAN
                 </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-sm bg-amber-500/10 border border-amber-400/40 text-amber-300 font-mono font-bold uppercase tracking-wider shadow-[0_0_12px_rgba(245,158,11,0.25)]">
+                <span className="text-[10px] px-2 py-0.5 rounded-sm bg-white/10 border border-white/20 text-zinc-200 font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_10px_rgba(255,255,255,0.05)]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#4285F4] shadow-[0_0_6px_rgba(66,133,244,0.8)]" />
                   Audit Verified
                 </span>
               </div>
@@ -462,14 +471,14 @@ export default function App() {
               onClick={() => setIsWorkspaceModalOpen(true)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                 workspaceState.isAuthenticated
-                  ? "bg-emerald-500/15 border-emerald-400/50 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.35)]"
+                  ? "bg-white/10 border-white/40 text-white shadow-[0_0_15px_rgba(255,255,255,0.2)]"
                   : isDarkMode
-                  ? "bg-zinc-950 border-white/15 text-zinc-300 hover:text-white hover:border-emerald-400/40 hover:bg-emerald-950/20 shadow-[0_0_15px_rgba(0,0,0,0.5)]"
+                  ? "bg-zinc-950 border-white/15 text-zinc-300 hover:text-white hover:border-white/30 hover:bg-zinc-900 shadow-[0_0_15px_rgba(0,0,0,0.5)]"
                   : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
               }`}
               title="Google Workspace (Sheets, Calendar, Gmail, Docs)"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400 drop-shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+              <FileSpreadsheet className="w-3.5 h-3.5 text-[#34A853] drop-shadow-[0_0_6px_rgba(52,168,83,0.8)]" />
               <span className="hidden sm:inline">
                 {workspaceState.isAuthenticated ? "Google Connected" : "Workspace"}
               </span>
@@ -480,14 +489,14 @@ export default function App() {
               onClick={() => setIsNotionModalOpen(true)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                 notionConfig.apiKey
-                  ? "bg-violet-500/15 border-violet-400/50 text-violet-300 shadow-[0_0_15px_rgba(139,92,246,0.35)]"
+                  ? "bg-white/10 border-white/40 text-white shadow-[0_0_15px_rgba(255,255,255,0.2)]"
                   : isDarkMode
-                  ? "bg-zinc-950 border-white/15 text-zinc-300 hover:text-white hover:border-violet-400/40 hover:bg-violet-950/20 shadow-[0_0_15px_rgba(0,0,0,0.5)]"
+                  ? "bg-zinc-950 border-white/15 text-zinc-300 hover:text-white hover:border-white/30 hover:bg-zinc-900 shadow-[0_0_15px_rgba(0,0,0,0.5)]"
                   : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
               }`}
               title="Notion Database Integration"
             >
-              <Database className="w-3.5 h-3.5 text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.8)]" />
+              <Database className="w-3.5 h-3.5 text-[#4285F4] drop-shadow-[0_0_6px_rgba(66,133,244,0.8)]" />
               <span className="hidden sm:inline">Notion</span>
             </button>
 
@@ -495,27 +504,27 @@ export default function App() {
             <div
               className={`p-1.5 rounded-xl border text-xs flex items-center justify-center ${
                 isOnline
-                  ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/10 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
+                  ? "border-white/20 text-[#34A853] bg-white/5 shadow-[0_0_10px_rgba(52,168,83,0.2)]"
                   : "border-zinc-700 text-zinc-500 bg-zinc-900/50"
               }`}
               title={isOnline ? "Connected & Online" : "Working in Offline Mode"}
             >
               {isOnline ? (
-                <Wifi className="w-3.5 h-3.5 text-emerald-400 drop-shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+                <Wifi className="w-3.5 h-3.5 text-[#34A853] drop-shadow-[0_0_6px_rgba(52,168,83,0.8)]" />
               ) : (
                 <WifiOff className="w-3.5 h-3.5" />
               )}
             </div>
 
-            {/* Gamification Level & XP Pill - Shining Gold Trophy & Amber Glow */}
+            {/* Gamification Level & XP Pill - Clean Monochrome with Amber Accent */}
             <button
               onClick={() => setActiveTab("gamification")}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono font-bold border border-amber-400/35 bg-amber-500/10 text-amber-300 hover:bg-amber-400 hover:text-black hover:shadow-[0_0_25px_rgba(245,158,11,0.6)] transition-all cursor-pointer shadow-[0_0_15px_rgba(245,158,11,0.15)]"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono font-bold border border-white/20 bg-zinc-950 text-white hover:bg-white hover:text-black hover:shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all cursor-pointer shadow-[0_0_15px_rgba(0,0,0,0.5)]"
               title="View Gamification Badges, Streaks & Leaderboard"
             >
-              <Trophy className="w-3.5 h-3.5 text-amber-300 drop-shadow-[0_0_6px_rgba(251,191,36,0.9)]" />
+              <Trophy className="w-3.5 h-3.5 text-[#FBBC05] drop-shadow-[0_0_6px_rgba(251,188,5,0.8)]" />
               <span className="hidden sm:inline">L{gamification.level}</span>
-              <span className="drop-shadow-[0_0_6px_rgba(251,191,36,0.5)]">{gamification.xp.toLocaleString()} XP</span>
+              <span className="drop-shadow-[0_0_6px_rgba(255,255,255,0.4)]">{gamification.xp.toLocaleString()} XP</span>
             </button>
 
             {/* Dark Mode Toggle */}
@@ -523,36 +532,39 @@ export default function App() {
               onClick={() => setIsDarkMode((prev) => !prev)}
               className={`p-2 rounded-xl border transition-all cursor-pointer ${
                 isDarkMode
-                  ? "bg-zinc-950 border-white/15 text-zinc-300 hover:text-amber-300 hover:border-amber-400/30 hover:bg-zinc-900"
+                  ? "bg-zinc-950 border-white/15 text-zinc-300 hover:text-white hover:border-white/40 hover:bg-zinc-900"
                   : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
               }`}
               title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
             >
-              {isDarkMode ? <Sun className="w-4 h-4 text-amber-300 drop-shadow-[0_0_6px_rgba(251,191,36,0.8)]" /> : <Moon className="w-4 h-4 text-slate-600" />}
+              {isDarkMode ? <Sun className="w-4 h-4 text-white drop-shadow-[0_0_6px_rgba(255,255,255,0.8)]" /> : <Moon className="w-4 h-4 text-slate-600" />}
             </button>
 
-            {/* AI Advisor Button - Shining Radiant Sheen */}
+            {/* AI Advisor Button - Gemini AI Studio Radiant Button */}
             <button
               onClick={() => setIsAiChatOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-linear-to-r from-violet-600 via-indigo-500 to-cyan-500 text-white hover:brightness-115 shadow-[0_0_25px_rgba(99,102,241,0.55)] border border-violet-300/40 transition-all active:scale-98 cursor-pointer"
+              className="relative group p-[1.5px] rounded-xl overflow-hidden active:scale-98 transition-all cursor-pointer shadow-[0_0_25px_rgba(66,133,244,0.3)]"
             >
-              <Bot className="w-4 h-4 text-white drop-shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
-              <span className="hidden sm:inline">Clera AI</span>
+              <div className="absolute inset-0 bg-linear-to-r from-[#4285F4] via-[#EA4335] via-[#FBBC05] to-[#34A853] animate-pulse" />
+              <div className="relative px-3.5 py-1.5 rounded-[10px] bg-black text-white text-xs font-extrabold flex items-center gap-1.5 group-hover:bg-zinc-900 transition-colors">
+                <Bot className="w-4 h-4 text-[#4285F4] drop-shadow-[0_0_6px_rgba(66,133,244,0.9)]" />
+                <span className="hidden sm:inline">Clera AI</span>
+              </div>
             </button>
           </div>
         </div>
 
-        {/* View Switcher Tabs - Shining Colors over Lethal Black */}
+        {/* View Switcher Tabs - Black & White with Gemini 4-Color Accents */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center gap-1.5 overflow-x-auto scrollbar-none py-2">
           <button
             onClick={() => setActiveTab("overview")}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
               activeTab === "overview"
-                ? "bg-white text-black font-extrabold shadow-[0_0_25px_rgba(255,255,255,0.45)] border border-white"
-                : "text-zinc-400 hover:text-white hover:bg-white/10 border border-white/5 hover:border-amber-400/30"
+                ? "bg-white text-black font-extrabold shadow-[0_0_20px_rgba(255,255,255,0.4)] border border-white"
+                : "text-zinc-400 hover:text-white hover:bg-white/10 border border-white/5 hover:border-white/20"
             }`}
           >
-            <LayoutDashboard className="w-3.5 h-3.5 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.7)]" />
+            <LayoutDashboard className="w-3.5 h-3.5 text-[#FBBC05] drop-shadow-[0_0_6px_rgba(251,188,5,0.7)]" />
             <span>Overview &amp; 3D Core</span>
           </button>
 
@@ -560,17 +572,17 @@ export default function App() {
             onClick={() => setActiveTab("habits")}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
               activeTab === "habits"
-                ? "bg-white text-black font-extrabold shadow-[0_0_25px_rgba(255,255,255,0.45)] border border-white"
-                : "text-zinc-400 hover:text-white hover:bg-white/10 border border-white/5 hover:border-emerald-400/30"
+                ? "bg-white text-black font-extrabold shadow-[0_0_20px_rgba(255,255,255,0.4)] border border-white"
+                : "text-zinc-400 hover:text-white hover:bg-white/10 border border-white/5 hover:border-white/20"
             }`}
           >
-            <Flame className="w-3.5 h-3.5 text-orange-400 fill-orange-400/30 drop-shadow-[0_0_6px_rgba(249,115,22,0.8)]" />
+            <Flame className="w-3.5 h-3.5 text-[#EA4335] fill-[#EA4335]/30 drop-shadow-[0_0_6px_rgba(234,67,53,0.8)]" />
             <span>Daily Habits</span>
             <span
               className={`text-[10px] px-1.5 rounded-full font-mono font-bold ${
                 activeTab === "habits"
-                  ? "bg-black text-emerald-400"
-                  : "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                  ? "bg-black text-[#EA4335]"
+                  : "bg-white/10 text-zinc-200 border border-white/15"
               }`}
             >
               {completedTodayCount}/{habits.length}
@@ -581,18 +593,18 @@ export default function App() {
             onClick={() => setActiveTab("audit")}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
               activeTab === "audit"
-                ? "bg-white text-black font-extrabold shadow-[0_0_25px_rgba(255,255,255,0.45)] border border-white"
-                : "text-zinc-400 hover:text-white hover:bg-white/10 border border-white/5 hover:border-blue-400/30"
+                ? "bg-white text-black font-extrabold shadow-[0_0_20px_rgba(255,255,255,0.4)] border border-white"
+                : "text-zinc-400 hover:text-white hover:bg-white/10 border border-white/5 hover:border-white/20"
             }`}
           >
-            <Shield className="w-3.5 h-3.5 text-blue-400 drop-shadow-[0_0_6px_rgba(96,165,250,0.8)]" />
+            <Shield className="w-3.5 h-3.5 text-[#4285F4] drop-shadow-[0_0_6px_rgba(66,133,244,0.8)]" />
             <span>Manhattan Audit</span>
             {auditData && (
               <span
                 className={`text-[10px] px-1.5 rounded-full font-mono font-bold ${
                   activeTab === "audit"
-                    ? "bg-black text-amber-400"
-                    : "bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                    ? "bg-black text-[#4285F4]"
+                    : "bg-white/10 text-zinc-200 border border-white/15"
                 }`}
               >
                 {auditData.currentScore}
@@ -604,11 +616,11 @@ export default function App() {
             onClick={() => setActiveTab("diary")}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
               activeTab === "diary"
-                ? "bg-white text-black font-extrabold shadow-[0_0_25px_rgba(255,255,255,0.45)] border border-white"
-                : "text-zinc-400 hover:text-white hover:bg-white/10 border border-white/5 hover:border-emerald-400/30"
+                ? "bg-white text-black font-extrabold shadow-[0_0_20px_rgba(255,255,255,0.4)] border border-white"
+                : "text-zinc-400 hover:text-white hover:bg-white/10 border border-white/5 hover:border-white/20"
             }`}
           >
-            <BookOpen className="w-3.5 h-3.5 text-emerald-400 drop-shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+            <BookOpen className="w-3.5 h-3.5 text-[#34A853] drop-shadow-[0_0_6px_rgba(52,168,83,0.8)]" />
             <span>Clera Diary</span>
           </button>
 
@@ -616,11 +628,11 @@ export default function App() {
             onClick={() => setActiveTab("analytics")}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
               activeTab === "analytics"
-                ? "bg-white text-black font-extrabold shadow-[0_0_25px_rgba(255,255,255,0.45)] border border-white"
-                : "text-zinc-400 hover:text-white hover:bg-white/10 border border-white/5 hover:border-purple-400/30"
+                ? "bg-white text-black font-extrabold shadow-[0_0_20px_rgba(255,255,255,0.4)] border border-white"
+                : "text-zinc-400 hover:text-white hover:bg-white/10 border border-white/5 hover:border-white/20"
             }`}
           >
-            <TrendingUp className="w-3.5 h-3.5 text-purple-400 drop-shadow-[0_0_6px_rgba(192,132,252,0.8)]" />
+            <TrendingUp className="w-3.5 h-3.5 text-[#4285F4] drop-shadow-[0_0_6px_rgba(66,133,244,0.8)]" />
             <span>Analytics &amp; Correlations</span>
           </button>
 
@@ -628,20 +640,20 @@ export default function App() {
             onClick={() => setActiveTab("gamification")}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
               activeTab === "gamification"
-                ? "bg-white text-black font-extrabold shadow-[0_0_25px_rgba(255,255,255,0.45)] border border-white"
-                : "text-zinc-400 hover:text-white hover:bg-white/10 border border-white/5 hover:border-amber-400/30"
+                ? "bg-white text-black font-extrabold shadow-[0_0_20px_rgba(255,255,255,0.4)] border border-white"
+                : "text-zinc-400 hover:text-white hover:bg-white/10 border border-white/5 hover:border-white/20"
             }`}
           >
-            <Trophy className="w-3.5 h-3.5 text-amber-300 drop-shadow-[0_0_6px_rgba(251,191,36,0.8)]" />
+            <Trophy className="w-3.5 h-3.5 text-[#FBBC05] drop-shadow-[0_0_6px_rgba(251,188,5,0.8)]" />
             <span>Gamification</span>
             <span
               className={`text-[10px] px-1.5 rounded-full font-mono font-bold ${
                 activeTab === "gamification"
-                  ? "bg-black text-amber-400"
-                  : "bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                  ? "bg-black text-[#FBBC05]"
+                  : "bg-white/10 text-zinc-200 border border-white/15"
               }`}
             >
-              {gamification.streakDays}d 🔥
+              {gamification.streakDays}d
             </span>
           </button>
         </div>
@@ -672,26 +684,29 @@ export default function App() {
                 />
               </div>
 
-              {/* Right Manhattan Quick Audit & Status Card (5 cols) - Lethal Shining Black with Golden & Emerald Accents */}
+              {/* Right Manhattan Quick Audit & Status Card (5 cols) - Black & White with Gemini Color Flow */}
               <div
                 className={`lg:col-span-5 relative overflow-hidden rounded-2xl border p-5 flex flex-col justify-between h-72 transition-all ${
                   isDarkMode
-                    ? "bg-radial from-zinc-900/90 via-black to-zinc-950 border-amber-500/20 text-white shadow-[0_0_35px_rgba(245,158,11,0.08)] before:absolute before:inset-x-0 before:top-0 before:h-[1px] before:bg-linear-to-r before:from-transparent before:via-amber-400/60 before:to-transparent"
+                    ? "bg-radial from-zinc-900/90 via-black to-zinc-950 border-white/15 text-white shadow-[0_0_35px_rgba(0,0,0,0.8)] before:absolute before:inset-x-0 before:top-0 before:h-[2px] before:bg-linear-to-r before:from-[#4285F4] before:via-[#EA4335] before:via-[#FBBC05] before:to-[#34A853]"
                     : "bg-white border-slate-200 text-slate-900 shadow-sm"
                 }`}
               >
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-amber-300/80">
-                      Evening Snapshot · Asia/Yangon
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#4285F4]" />
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400">
+                        Evening Snapshot · Asia/Yangon
+                      </span>
+                    </div>
                     <span
                       className={`text-xs px-2.5 py-0.5 rounded-md font-mono font-bold border ${
                         auditData?.currentScore && auditData.currentScore >= 80
-                          ? "bg-emerald-500/15 text-emerald-300 border-emerald-400/40 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
+                          ? "bg-white/10 text-white border-white/30 shadow-[0_0_10px_rgba(255,255,255,0.2)]"
                           : auditData?.currentScore && auditData.currentScore >= 60
-                          ? "bg-cyan-500/15 text-cyan-300 border-cyan-400/40 shadow-[0_0_12px_rgba(6,182,212,0.3)]"
-                          : "bg-amber-500/15 text-amber-300 border-amber-400/40 shadow-[0_0_12px_rgba(245,158,11,0.3)]"
+                          ? "bg-white/10 text-zinc-200 border-white/20"
+                          : "bg-black text-zinc-300 border-white/15"
                       }`}
                     >
                       {auditData?.rating ?? "Weak"}
@@ -699,11 +714,11 @@ export default function App() {
                   </div>
 
                   <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-3xl font-black font-mono text-amber-400 drop-shadow-[0_0_18px_rgba(251,191,36,0.65)]">
+                    <span className="text-3xl font-black font-mono text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">
                       {auditData?.currentScore ?? 17}
                     </span>
-                    <span className="text-xs text-amber-200/60 font-mono">/100</span>
-                    <span className="text-xs font-bold uppercase ml-2 px-2 py-0.5 rounded-sm bg-amber-500/10 border border-amber-400/30 text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.2)]">
+                    <span className="text-xs text-zinc-400 font-mono">/100</span>
+                    <span className="text-xs font-bold uppercase ml-2 px-2 py-0.5 rounded-sm bg-white/10 border border-white/20 text-white shadow-[0_0_10px_rgba(255,255,255,0.1)]">
                       {auditData?.verdict ?? "MISSED TARGET"}
                     </span>
                   </div>
@@ -717,17 +732,21 @@ export default function App() {
                 <div className="border-t border-white/10 pt-3 flex items-center justify-between text-xs font-mono">
                   <div>
                     <span className="text-zinc-400 block text-[10px]">Daily Execution</span>
-                    <span className="font-bold text-emerald-400 drop-shadow-[0_0_6px_rgba(52,211,153,0.7)]">{auditData?.dailyExecution ?? "0/5"}</span>
+                    <span className="font-bold text-white flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#34A853]" />
+                      {auditData?.dailyExecution ?? "0/5"}
+                    </span>
                   </div>
                   <div>
                     <span className="text-zinc-400 block text-[10px]">Weekly Acceptance</span>
-                    <span className="font-bold text-amber-300">
+                    <span className="font-bold text-zinc-200 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#FBBC05]" />
                       {auditData?.weeklyAcceptance ?? "0/6 due Sep13"}
                     </span>
                   </div>
                   <button
                     onClick={() => setActiveTab("audit")}
-                    className="px-3.5 py-1.5 rounded-lg bg-linear-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-black font-sans text-xs font-extrabold shadow-[0_0_18px_rgba(245,158,11,0.45)] transition-all cursor-pointer"
+                    className="px-3.5 py-1.5 rounded-lg bg-white hover:bg-zinc-200 text-black font-sans text-xs font-extrabold shadow-[0_0_15px_rgba(255,255,255,0.3)] transition-all cursor-pointer"
                   >
                     View Audit
                   </button>
