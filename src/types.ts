@@ -101,10 +101,42 @@ export interface CleraDiaryEntry {
 }
 
 export interface NotionConfig {
-  apiKey: string;
-  databaseId: string;
+  databaseId?: string;
   lastSyncedAt?: string;
   autoSync: boolean;
+}
+
+export interface NotionDiarySyncEntry {
+  date: string; // YYYY-MM-DD
+  title: string;
+  dayScore: number;
+  verdict: string;
+  executiveSummary: string;
+  biggestWin: string;
+  biggestExecutionLeak: string;
+  tomorrowsFirstAction: string;
+  openQuestionsBlockers?: string;
+  evidenceLinks?: string;
+}
+
+export interface NotionSyncRequestBody {
+  action: "test" | "sync_entry";
+  entry?: NotionDiarySyncEntry;
+}
+
+export interface NotionSyncResponse {
+  success: boolean;
+  message: string;
+  pageId?: string;
+  url?: string;
+  updated?: boolean;
+  databaseTitle?: string;
+  schemaDetails?: {
+    propertiesFound: string[];
+    missingProperties: string[];
+    warnings?: string[];
+  };
+  error?: string;
 }
 
 export interface GoogleWorkspaceState {

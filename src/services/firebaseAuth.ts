@@ -81,6 +81,22 @@ export const getAccessToken = async (): Promise<string | null> => {
   return cachedAccessToken;
 };
 
+/**
+ * Retrieve the current Firebase User's ID token (JWT) for authenticating with backend APIs.
+ * This is distinct from Google OAuth access tokens used for Google Workspace / Sheets.
+ */
+export const getFirebaseIdToken = async (forceRefresh: boolean = false): Promise<string | null> => {
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    return null;
+  }
+  return currentUser.getIdToken(forceRefresh);
+};
+
+export const getCurrentFirebaseUser = () => {
+  return auth.currentUser;
+};
+
 export const logout = async () => {
   await signOut(auth);
   cachedAccessToken = null;

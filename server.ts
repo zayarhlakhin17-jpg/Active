@@ -3,6 +3,12 @@ import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { createServer as createViteServer } from "vite";
+import { verifyOwnerAuth } from "./server/firebaseAdmin";
+import {
+  getValidatedServerConfig,
+  testNotionConnection,
+  syncDiaryEntry,
+} from "./server/notionService";
 
 dotenv.config();
 
@@ -186,122 +192,54 @@ Tone: Highly disciplined, supportive, crisp, and executive. Always confirm what 
 });
 
 // Notion API Integration Endpoint
-// Handles syncing project documentation and database entries automatically
+// Protected with Firebase Admin ID token authentication (Single-Owner: ADMIN_FIREBASE_UID)
 app.post("/api/notion/sync", async (req, res) => {
   try {
-    const { apiKey, databaseId, action = "test_or_sync", record } = req.body;
-    const notionKey = apiKey || process.env.NOTION_API_KEY;
-    const dbId = databaseId || process.env.NOTION_DATABASE_ID;
-
-    if (!notionKey) {
+    // 1. Reject client-supplied credentials or destination overrides immediately
+    if (req.body && (req.body.apiKey !== undefined || req.body.databaseId !== undefined)) {
       return res.status(400).json({
-        error: "Notion API Key / Internal Integration Token is required. Please provide it in settings or environment.",
+        error:
+          "Client-supplied Notion credentials or destination overrides are forbidden. Configure NOTION_API_KEY and NOTION_DATABASE_ID in server environment variables.",
       });
     }
+
+    // 2. Authenticate user: requires Firebase ID token verified with Firebase Admin & matching ADMIN_FIREBASE_UID
+    const authHeader = req.headers.authorization;
+    const bearerToken = authHeader?.startsWith("Bearer ")
+      ? authHeader.slice(7).trim()
+      : (req.body?.idToken || null);
+
+    try {
+      await verifyOwnerAuth(bearerToken);
+    } catch (authErr: any) {
+      const statusCode = authErr.status || 401;
+      return res.status(statusCode).json({
+        error: authErr.message || "Unauthorized access.",
+      });
+    }
+
+    // 3. Validate server-side Notion credentials & destination
+    const { apiKey, databaseId } = getValidatedServerConfig(req.body);
+
+    const { action = "test", entry } = req.body;
 
     if (action === "test") {
-      // Test Notion connection by querying user or database
-      const notionRes = await fetch("https://api.notion.com/v1/users/me", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${notionKey}`,
-          "Notion-Version": "2022-06-28",
-        },
-      });
-      const data = await notionRes.json();
-      if (!notionRes.ok) {
-        return res.status(notionRes.status).json({
-          error: data.message || "Failed to connect to Notion API",
-        });
-      }
-      return res.json({
-        success: true,
-        message: `Successfully connected to Notion as ${data.name || data.bot?.owner?.user?.name || "Integration Bot"}`,
-        botInfo: data,
-      });
+      const testResult = await testNotionConnection(apiKey, databaseId);
+      return res.json(testResult);
     }
 
-    if (action === "sync_entry" && dbId) {
-      // Create or sync a page in the specified database
-      const cleanDbId = dbId.replace(/-/g, "");
-      const pagePayload = {
-        parent: { database_id: cleanDbId },
-        properties: {
-          Name: {
-            title: [
-              {
-                text: {
-                  content: record?.title || `Manhattan Audit - ${record?.date || new Date().toISOString().slice(0, 10)}`,
-                },
-              },
-            ],
-          },
-          ...(record?.score !== undefined && {
-            Score: {
-              number: Number(record.score),
-            },
-          }),
-          ...(record?.verdict && {
-            Verdict: {
-              select: {
-                name: String(record.verdict),
-              },
-            },
-          }),
-        },
-        children: [
-          {
-            object: "block",
-            type: "paragraph",
-            paragraph: {
-              rich_text: [
-                {
-                  type: "text",
-                  text: {
-                    content: record?.executiveSummary || record?.biggestWin || "Synced from Manhattan Habit Tracker",
-                  },
-                },
-              ],
-            },
-          },
-        ],
-      };
-
-      const notionRes = await fetch("https://api.notion.com/v1/pages", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${notionKey}`,
-          "Content-Type": "application/json",
-          "Notion-Version": "2022-06-28",
-        },
-        body: JSON.stringify(pagePayload),
-      });
-
-      const data = await notionRes.json();
-      if (!notionRes.ok) {
-        return res.status(notionRes.status).json({
-          error: data.message || "Failed to create page in Notion database",
-          details: data,
-        });
-      }
-
-      return res.json({
-        success: true,
-        message: "Entry successfully synchronized with Notion database.",
-        notionPageId: data.id,
-        url: data.url,
-      });
+    if (action === "sync_entry") {
+      const syncResult = await syncDiaryEntry(apiKey, databaseId, entry);
+      return res.json(syncResult);
     }
 
-    // Default response if no databaseId or query
-    return res.json({
-      success: true,
-      message: "Notion credentials validated. Ready for automated database synchronization.",
+    return res.status(400).json({
+      error: `Unsupported action '${action}'. Expected 'test' or 'sync_entry'.`,
     });
   } catch (error: any) {
-    console.error("Notion Sync Error:", error);
-    return res.status(500).json({
-      error: error?.message || "Internal server error during Notion sync",
+    const status = error.status || 500;
+    return res.status(status).json({
+      error: error.message || "Internal server error during Notion synchronization.",
     });
   }
 });
@@ -352,4 +290,9 @@ async function startServer() {
   });
 }
 
-startServer();
+export default app;
+export { app, startServer };
+
+if (process.env.NODE_ENV !== "test" && !process.env.VERCEL) {
+  startServer();
+}

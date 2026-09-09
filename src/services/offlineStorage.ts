@@ -39,13 +39,30 @@ export function loadLocalState(): StoredState {
     const rawNotion = localStorage.getItem(STORAGE_KEYS.NOTION);
     const rawGamification = localStorage.getItem(STORAGE_KEYS.GAMIFICATION);
 
+    // Sanitize Notion config: remove any legacy apiKey or secret tokens
+    let sanitizedNotion: NotionConfig = { databaseId: "", autoSync: false };
+    if (rawNotion) {
+      try {
+        const parsed = JSON.parse(rawNotion);
+        sanitizedNotion = {
+          databaseId: parsed.databaseId || "",
+          autoSync: Boolean(parsed.autoSync),
+          lastSyncedAt: parsed.lastSyncedAt,
+        };
+        // If legacy apiKey existed in storage, sanitize localStorage now
+        if ("apiKey" in parsed) {
+          localStorage.setItem(STORAGE_KEYS.NOTION, JSON.stringify(sanitizedNotion));
+        }
+      } catch {
+        sanitizedNotion = { databaseId: "", autoSync: false };
+      }
+    }
+
     return {
       habits: rawHabits ? JSON.parse(rawHabits) : initialHabits,
       auditData: rawAudit ? JSON.parse(rawAudit) : initialManhattanData,
       diary: rawDiary ? JSON.parse(rawDiary) : initialCleraDiary,
-      notionConfig: rawNotion
-        ? JSON.parse(rawNotion)
-        : { apiKey: "", databaseId: "", autoSync: false },
+      notionConfig: sanitizedNotion,
       gamification: rawGamification
         ? JSON.parse(rawGamification)
         : initialGamification,
@@ -57,7 +74,7 @@ export function loadLocalState(): StoredState {
       habits: initialHabits,
       auditData: initialManhattanData,
       diary: initialCleraDiary,
-      notionConfig: { apiKey: "", databaseId: "", autoSync: false },
+      notionConfig: { databaseId: "", autoSync: false },
       gamification: initialGamification,
       lastLocalSavedAt: new Date().toISOString(),
     };
@@ -82,7 +99,10 @@ export function saveLocalState(state: {
       localStorage.setItem(STORAGE_KEYS.DIARY, JSON.stringify(state.diary));
     }
     if (state.notionConfig) {
-      localStorage.setItem(STORAGE_KEYS.NOTION, JSON.stringify(state.notionConfig));
+      // Ensure no apiKey or token is stored
+      const { ...safeNotion } = state.notionConfig as any;
+      delete safeNotion.apiKey;
+      localStorage.setItem(STORAGE_KEYS.NOTION, JSON.stringify(safeNotion));
     }
     if (state.gamification) {
       localStorage.setItem(
@@ -127,13 +147,24 @@ export function clearPendingSyncQueue() {
 // Push local state to server cloud sync
 export async function pushToCloudSync(userId: string, data: StoredState): Promise<boolean> {
   try {
+    // Ensure no Notion API key or sensitive credentials are ever sent in cloud payload
+    const safeNotion = {
+      databaseId: data.notionConfig?.databaseId || "",
+      autoSync: Boolean(data.notionConfig?.autoSync),
+      lastSyncedAt: data.notionConfig?.lastSyncedAt,
+    };
+    const sanitizedPayload = {
+      ...data,
+      notionConfig: safeNotion,
+    };
+
     const res = await fetch("/api/cloud/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         userId,
         mode: "push",
-        payload: data,
+        payload: sanitizedPayload,
       }),
     });
     if (res.ok) {
