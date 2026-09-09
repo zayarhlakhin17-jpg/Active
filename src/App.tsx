@@ -22,7 +22,8 @@ import {
   getPendingSyncCount,
 } from "./services/offlineStorage";
 import { initialGamification } from "./data/initialData";
-import { initAuth } from "./services/firebaseAuth";
+import { initAuth, googleSignIn, getAccessToken } from "./services/firebaseAuth";
+import { pullManhattanDailyReports } from "./services/workspaceApi";
 import { Visualizer3D } from "./components/Visualizer3D";
 import { HabitDashboard } from "./components/HabitDashboard";
 import { ManhattanAuditView } from "./components/ManhattanAuditView";
@@ -98,6 +99,9 @@ export default function App() {
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
   const [syncToast, setSyncToast] = useState<string | null>(null);
+  const [isSyncingManhattan, setIsSyncingManhattan] = useState<boolean>(false);
+  const [lastSyncedManhattan, setLastSyncedManhattan] = useState<string | null>(null);
+  const [syncManhattanError, setSyncManhattanError] = useState<string | null>(null);
 
   // Initialize Data from Local Storage
   useEffect(() => {
@@ -410,6 +414,94 @@ export default function App() {
       showToast("Cloud state synchronized successfully.");
     } else {
       showToast("Cloud sync queued in local storage.");
+    }
+  };
+
+  // SYNC MANHATTAN: Manual Google Sheets Import from 'Daily Reports'!A4:W
+  const handleSyncManhattan = async () => {
+    setIsSyncingManhattan(true);
+    setSyncManhattanError(null);
+
+    try {
+      // 1. Verify user is signed into Google
+      let token = await getAccessToken();
+      if (!token || !workspaceState.isAuthenticated) {
+        showToast("Prompting Google Sign-In for Google Sheets read access...");
+        const authRes = await googleSignIn();
+        if (!authRes || !authRes.accessToken) {
+          throw new Error("Google Sign-In failed or was cancelled by user.");
+        }
+        token = authRes.accessToken;
+        setWorkspaceState({
+          isAuthenticated: true,
+          userEmail: authRes.user.email,
+          userName: authRes.user.displayName,
+          userPhoto: authRes.user.photoURL,
+          accessToken: token,
+        });
+      }
+
+      // 2. Fetch existing Daily Reports data from Google Sheets ('Daily Reports'!A4:W)
+      const reports = await pullManhattanDailyReports();
+
+      if (!reports || reports.length === 0) {
+        throw new Error("No daily report rows found in spreadsheet range 'Daily Reports'!A4:W.");
+      }
+
+      // 3. Load the newest report into the Manhattan Audit dashboard
+      const newest = reports[0];
+      const timeStr = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      setLastSyncedManhattan(timeStr);
+
+      setAuditData((prev) => {
+        if (!prev) return prev;
+
+        // Build or update history entry matching the newest report
+        const updatedHistory = [...prev.history];
+        const existingIdx = updatedHistory.findIndex((h) => h.date === newest.date);
+        const reportScore = Number(newest.totalScore) || prev.currentScore;
+        const reportVerdict = newest.managerAssessment || newest.status || prev.verdict;
+
+        const mappedEntry: DailyScoreEntry = {
+          date: newest.date || new Date().toISOString().slice(0, 10),
+          score: reportScore,
+          verdict: reportVerdict,
+          executionRatio: newest.completeness || prev.dailyExecution,
+          commitsCount: newest.gitCommits ? (newest.gitCommits.match(/[a-f0-9]{7,40}/gi)?.length || 1) : 0,
+          notes: newest.practicalWorkBuilt || newest.plannedDeliverable || "",
+          isProvisional: newest.status?.toLowerCase().includes("provisional") || false,
+        };
+
+        if (existingIdx >= 0) {
+          updatedHistory[existingIdx] = mappedEntry;
+        } else {
+          updatedHistory.unshift(mappedEntry);
+        }
+
+        const updatedAudit: ManhattanAuditData = {
+          ...prev,
+          currentScore: reportScore,
+          verdict: reportVerdict,
+          latestAuditDate: newest.date || prev.latestAuditDate,
+          dailyExecution: newest.completeness || prev.dailyExecution,
+          weeklyAcceptance: newest.sprint ? `Sprint ${newest.sprint}` : prev.weeklyAcceptance,
+          latestReport: newest,
+          reports: reports,
+          history: updatedHistory,
+        };
+
+        saveLocalState({ auditData: updatedAudit });
+        return updatedAudit;
+      });
+
+      showToast(`Manhattan Synced! Newest report loaded (${newest.date || "Latest"}: ${newest.totalScore}/100)`);
+    } catch (err: any) {
+      console.error("Failed to sync Manhattan reports:", err);
+      const errMsg = err?.message || "Failed to sync Manhattan daily reports from Google Sheets.";
+      setSyncManhattanError(errMsg);
+      showToast(`Sync error: ${errMsg}`);
+    } finally {
+      setIsSyncingManhattan(false);
     }
   };
 
@@ -818,6 +910,10 @@ export default function App() {
               onOpenWorkspaceModal={() => setIsWorkspaceModalOpen(true)}
               onOpenNotionModal={() => setIsNotionModalOpen(true)}
               isDarkMode={isDarkMode}
+              onSyncManhattan={handleSyncManhattan}
+              isSyncing={isSyncingManhattan}
+              lastSyncedAt={lastSyncedManhattan}
+              syncError={syncManhattanError}
             />
           </div>
         )}

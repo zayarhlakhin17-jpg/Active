@@ -44,6 +44,24 @@ export interface OperatingRule {
   rule: string;
 }
 
+export interface ManhattanDailyReport {
+  date: string;
+  sprint: string;
+  status: string;
+  plannedDeliverable: string;
+  whatILearned: string;
+  practicalWorkBuilt: string;
+  evidenceLinks: string;
+  gitCommits: string;
+  testsChecks: string;
+  blockers: string;
+  nextFirstAction: string;
+  totalScore: number;
+  managerAssessment: string;
+  completeness: string;
+  raw?: Record<string, string>;
+}
+
 export interface ManhattanAuditData {
   latestAuditDate: string;
   timeZone: string;
@@ -61,6 +79,8 @@ export interface ManhattanAuditData {
   noEvidenceDays: number;
   history: DailyScoreEntry[];
   operatingRules: OperatingRule[];
+  latestReport?: ManhattanDailyReport;
+  reports?: ManhattanDailyReport[];
 }
 
 export interface CleraDiaryEntry {
