@@ -2,12 +2,12 @@ import express from "express";
 import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
-import { verifyOwnerAuth } from "./server/firebaseAdmin.ts";
+import { verifyOwnerAuth } from "./server/firebaseAdmin.js";
 import {
   getValidatedServerConfig,
   testNotionConnection,
   syncDiaryEntry,
-} from "./server/notionService.ts";
+} from "./server/notionService.js";
 
 dotenv.config();
 

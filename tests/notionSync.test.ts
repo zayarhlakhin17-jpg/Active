@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import request from "supertest";
-import app from "../server.ts";
-import { verifyOwnerAuth } from "../server/firebaseAdmin.ts";
+import * as esbuild from "esbuild";
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
+import { execFileSync } from "node:child_process";
+import app from "../server.js";
+import { verifyOwnerAuth } from "../server/firebaseAdmin.js";
 import {
   normalizeNotionDatabaseId,
   getValidatedServerConfig,
@@ -11,7 +16,7 @@ import {
   splitTextToRichText,
   resolveSchemaMapping,
   NOTION_FIELD_MAX_LENGTH,
-} from "../server/notionService.ts";
+} from "../server/notionService.js";
 
 const mockVerifyIdToken = vi.fn();
 
@@ -581,17 +586,120 @@ describe("Notion Integration & Security Hardening Tests", () => {
 
   describe("8. Vercel Serverless Entrypoint (api/index.ts)", () => {
     it("imports Vercel serverless entrypoint without throwing ERR_UNSUPPORTED_DIR_IMPORT", async () => {
-      const vercelModule = await import("../api/index.ts");
+      const vercelModule = await import("../api/index.js");
       expect(vercelModule.default).toBeDefined();
       expect(vercelModule.default).toBe(app);
     });
 
     it("handles /api/health through the Vercel entrypoint app", async () => {
-      const vercelModule = await import("../api/index.ts");
+      const vercelModule = await import("../api/index.js");
       const vercelApp = vercelModule.default;
       const res = await request(vercelApp).get("/api/health");
       expect(res.status).toBe(200);
       expect(res.body.status).toBe("ok");
+    });
+
+    it("transpiles Vercel API graph to JS and boots emitted api/index.js in pure Node ESM with VERCEL=1", async () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "vercel-esm-smoke-"));
+      try {
+        fs.symlinkSync(path.resolve("node_modules"), path.join(tmpDir, "node_modules"), "junction");
+        fs.writeFileSync(path.join(tmpDir, "package.json"), JSON.stringify({ type: "module" }));
+
+        // Transpile the serverless dependency graph without Vitest's TS resolver
+        await esbuild.build({
+          entryPoints: [
+            "api/index.ts",
+            "server.ts",
+            "server/firebaseAdmin.ts",
+            "server/notionService.ts",
+          ],
+          outdir: tmpDir,
+          format: "esm",
+          platform: "node",
+          packages: "external",
+          bundle: false,
+        });
+
+        // Ensure emitted files exist as .js
+        expect(fs.existsSync(path.join(tmpDir, "api/index.js"))).toBe(true);
+        expect(fs.existsSync(path.join(tmpDir, "server.js"))).toBe(true);
+        expect(fs.existsSync(path.join(tmpDir, "server/firebaseAdmin.js"))).toBe(true);
+        expect(fs.existsSync(path.join(tmpDir, "server/notionService.js"))).toBe(true);
+
+        // Run pure Node ESM child process with VERCEL=1 (no TS runtime / loader)
+        const script = `
+          import app from "./api/index.js";
+          import http from "node:http";
+
+          const server = http.createServer(app);
+          server.listen(0, "127.0.0.1", () => {
+            const port = server.address().port;
+            http.get(\`http://127.0.0.1:\${port}/api/health\`, (res) => {
+              let body = "";
+              res.on("data", chunk => body += chunk);
+              res.on("end", () => {
+                server.close();
+                process.stdout.write("__PAYLOAD__" + JSON.stringify({ statusCode: res.statusCode, body: JSON.parse(body) }));
+                process.exit(0);
+              });
+            }).on("error", (err) => {
+              server.close();
+              process.stderr.write(err.message);
+              process.exit(1);
+            });
+          });
+        `;
+
+        const rawOutput = execFileSync(process.execPath, ["--input-type=module", "-e", script], {
+          cwd: tmpDir,
+          env: {
+            ...process.env,
+            VERCEL: "1",
+            NODE_ENV: "production",
+          },
+          encoding: "utf8",
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+
+        const match = rawOutput.match(/__PAYLOAD__(.+)/);
+        expect(match).not.toBeNull();
+        const result = JSON.parse(match![1]);
+        expect(result.statusCode).toBe(200);
+        expect(result.body.status).toBe("ok");
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("verifies pure Node ESM fails with ERR_MODULE_NOT_FOUND when emitted JS imports a .ts specifier", async () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "vercel-esm-failure-check-"));
+      try {
+        fs.symlinkSync(path.resolve("node_modules"), path.join(tmpDir, "node_modules"), "junction");
+        fs.writeFileSync(path.join(tmpDir, "package.json"), JSON.stringify({ type: "module" }));
+        fs.mkdirSync(path.join(tmpDir, "api"));
+
+        // Simulate incorrect emitted file importing .ts
+        fs.writeFileSync(path.join(tmpDir, "api/index.js"), 'import app from "../server.ts"; export default app;');
+        fs.writeFileSync(path.join(tmpDir, "server.js"), "export default {};");
+
+        let thrownError = "";
+        try {
+          execFileSync(process.execPath, ["--input-type=module", "-e", 'import app from "./api/index.js";'], {
+            cwd: tmpDir,
+            env: { ...process.env, VERCEL: "1", NODE_ENV: "production" },
+            encoding: "utf8",
+            stdio: ["pipe", "pipe", "pipe"],
+          });
+        } catch (err: unknown) {
+          const execError = err as { stderr?: string; message?: string };
+          thrownError = (execError.stderr || "") + (execError.message || "");
+        }
+
+        expect(thrownError).toContain("ERR_MODULE_NOT_FOUND");
+        expect(thrownError).toContain("server.ts");
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
     });
   });
 });

@@ -1,7 +1,7 @@
 import type {
   NotionDiarySyncEntry,
   NotionSyncResponse
-} from "../src/types.ts";
+} from "../src/types.js";
 
 export const NOTION_API_VERSION = "2022-06-28";
 export const NOTION_TEXT_CHUNK_LIMIT = 2000;
