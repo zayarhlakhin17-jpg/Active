@@ -701,5 +701,39 @@ describe("Notion Integration & Security Hardening Tests", () => {
         fs.rmSync(tmpDir, { recursive: true, force: true });
       }
     });
+
+    it("confirms firebase-admin/auth and jwks-rsa resolve jose 4.15.9 without ERR_REQUIRE_ESM", () => {
+      const script = `
+        import { getAuth } from "firebase-admin/auth";
+        import { initializeApp, getApps } from "firebase-admin/app";
+        import fs from "node:fs";
+
+        // Confirm top-level override resolved jose to 4.15.9
+        const josePkg = JSON.parse(fs.readFileSync("node_modules/jose/package.json", "utf8"));
+        if (josePkg.version !== "4.15.9") {
+          throw new Error("Expected jose 4.15.9, got " + josePkg.version);
+        }
+
+        // Verify requiring jwks-rsa/src/utils.js does not throw ERR_REQUIRE_ESM
+        const { createRequire } = await import("node:module");
+        const req = createRequire(import.meta.url);
+        const jwksUtils = req("jwks-rsa/src/utils.js");
+        if (!jwksUtils) throw new Error("Failed to load jwks-rsa utils");
+
+        process.stdout.write("__FIREBASE_AUTH_OK__");
+      `;
+
+      const rawOutput = execFileSync(process.execPath, ["--no-experimental-require-module", "--input-type=module", "-e", script], {
+        cwd: process.cwd(),
+        env: {
+          ...process.env,
+          NODE_ENV: "production",
+        },
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+
+      expect(rawOutput).toContain("__FIREBASE_AUTH_OK__");
+    });
   });
 });
